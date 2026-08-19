@@ -435,8 +435,9 @@ function crmHTML(e) {
   b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps);
   if (e.verify) b += '<h4>조치 후 확인</h4><p>' + rich(e.verify) + '</p>';
   if (e.caution) b += '<h4>주의사항</h4><p>' + rich(e.caution) + '</p>';
-  b += '<div class="note">여기 순서는 <b>현장에서 실제로 한 순서</b>를 집계한 것입니다. ' +
-       'S/M 이 규정한 표준 절차가 아닙니다.</div>';
+  b += '<div class="note">항목은 현장 빈도로 뽑고, 표시 순서는 <b>작업 순서</b>' +
+       '(분해점검→세정→윤활→조정→재조립→<b>교체 마지막</b>)로 정렬했습니다. ' +
+       '빈도 분포는 위 그래프에 있습니다. S/M 이 규정한 표준 절차가 아닙니다.</div>';
   return '<details class="acc crm" open><summary>CRM Actual<span class="src">현장</span>' +
     '</summary><div class="body">' + b + '</div></details>';
 }
@@ -589,6 +590,12 @@ function dataHTML(e) {
     b += '<h4>Valve No.</h4><div class="chips">' +
       v.slice(0, 10).map(function (x) { return '<span class="chip">' + esc(x) + '</span>'; }).join('') +
       '</div>';
+  }
+  if (e.vfn && e.vfn.items && e.vfn.items.length) {
+    b += '<h4>Valve 기능 — S/M Ch.2 원문</h4><ul>' +
+      e.vfn.items.map(function (x) {
+        return '<li><b>' + esc(x[0]) + '</b> — ' + esc(x[1]) + '</li>';
+      }).join('') + '</ul>';
   }
   if ((e.crm || {}).skipped) {
     b += '<div class="note">이 Error 로 기록된 방문 중 <b>' + e.crm.skipped +
