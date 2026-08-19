@@ -261,13 +261,205 @@ function renderHome() {
     return rowHTML({ d: h.d, p: h.p, i: h.i, t: h.en, c: h.c, n: h.n, r: h.r, cz: '' });
   }).join('');
 
+  // PM(정기 점검)은 수리(TS)와 다른 업무다 — 구역을 나눠 섞이지 않게 둔다
+  var pmCard = META.pm
+    ? '<div class="sec pmsec"><h2>정기 점검 (PM)</h2>' +
+      '<button class="pmgo" data-go-pm="1"><b>PM 후 확인 체크리스트</b>' +
+      '<i>PM 직후에 실제로 터지는 곳만 · 체크 후 PDF·엑셀 출력</i></button>' +
+      '<p class="muted">수리(TS)와는 별개 업무입니다. 위쪽은 고장 수리용, ' +
+      '여기는 정기 점검용입니다.</p></div>'
+    : '';
+
   view.innerHTML =
-    '<div class="sec"><h2>장비</h2><div class="devs">' + devs + '</div></div>' +
+    '<div class="sec"><h2>수리 (TS) — 장비를 고르십시오</h2>' +
+    '<div class="devs">' + devs + '</div></div>' +
     recHTML +
     '<div class="sec"><h2>자주 발생하는 Error</h2>' +
     '<div class="card rows">' + hot + '</div>' +
     '<p class="muted">발생 건수 기준 상위입니다. 장비를 고르면 그 장비의 전체 목록이 나옵니다.</p></div>' +
-    offlineCardHTML();
+    pmCard + offlineCardHTML();
+}
+
+/* ── 화면 5: PM 후 확인 체크리스트 ──────────────────────
+   현장에서 체크하고 그대로 PDF(인쇄)·엑셀(CSV)로 내보낸다.
+   진행 중 앱을 닫아도 남도록 localStorage 에 저장한다. */
+var PM = null, PM_KEY = 'sysmex-ts-pm';
+
+function pmState() {
+  try { return JSON.parse(localStorage.getItem(PM_KEY) || 'null') || {}; }
+  catch (e) { return {}; }
+}
+function pmSave(s) {
+  try { localStorage.setItem(PM_KEY, JSON.stringify(s)); } catch (e) { /* 무시 */ }
+}
+
+function renderPM() {
+  titleEl.textContent = 'PM 후 확인';
+  subEl.textContent = '정기 점검 · 수리(TS)와 별개';
+  backEl.hidden = false; homeEl.hidden = false;
+  view.innerHTML = '<div class="card"><div class="empty">불러오는 중…</div></div>';
+
+  getJSON('pm.json').then(function (j) {
+    PM = j;
+    var s = pmState();
+    var head = ['model', 'serial', 'fac', 'date', 'eng'];
+    var lab = { model: 'Model', serial: 'Serial No.', fac: '기관',
+                date: 'PM 일자', eng: '담당 엔지니어' };
+    var hin = head.map(function (k) {
+      return '<label class="pmf"><span>' + lab[k] + '</span>' +
+        '<input id="pf_' + k + '" type="' + (k === 'date' ? 'date' : 'text') +
+        '" value="' + esc(s['h_' + k] || '') + '"></label>';
+    }).join('');
+
+    var rows = j.items.map(function (it, i) {
+      var acts = it.acts.map(function (a) {
+        var id = 'pm' + i + '_' + a;
+        var on = s[id] ? ' on' : '';
+        return '<label class="act' + on + '"><input type="checkbox" data-pm="' + id +
+          '"' + (s[id] ? ' checked' : '') + '><span>' + esc(a) + '</span></label>';
+      }).join('');
+      return '<div class="pmi"><div class="pmh"><span class="no">' + (i + 1) + '</span>' +
+        '<b>' + esc(it.item) + '</b>' +
+        '<span class="tag sp">' + it.x + '배</span></div>' +
+        '<p class="how">' + esc(it.how) + '</p>' +
+        '<p class="dim">PM 직후에 나는 Error — ' + esc(it.err) + '</p>' +
+        '<div class="acts">' + acts + '</div>' +
+        '<input class="memo" data-pm="m' + i + '" placeholder="비고 (측정값·특이사항)" value="' +
+        esc(s['m' + i] || '') + '"></div>';
+    }).join('');
+
+    var hz = (j.hazard || []).map(function (x) {
+      return '<tr><td>' + esc(x.band) + '</td><td>' + x.n + '</td>' +
+        '<td>' + x.rate + '</td><td>' + x.rel + '배</td></tr>';
+    }).join('');
+
+    var late = (j.late || []).map(function (x) {
+      return '<li>' + esc(x.err) + ' <span class="dim">— ' + esc(x.item) + '</span></li>';
+    }).join('');
+
+    view.innerHTML =
+      '<div class="card"><div class="pmhd">' + hin + '</div></div>' +
+      '<div class="sec"><h2>PM 에서 손댄 곳 — 마치기 전에 확인</h2>' + rows + '</div>' +
+      '<div class="card pmact">' +
+      '<button class="cta" id="pmPdf">PDF 로 저장 · 인쇄</button>' +
+      '<button class="obtn" id="pmCsv">엑셀(CSV) 내려받기</button>' +
+      '<button class="obtn ghost" id="pmClear">체크 지우기</button></div>' +
+      '<details class="acc dat"><summary>왜 이 항목인가<span class="src">데이터</span></summary>' +
+      '<div class="body"><p class="dim">' + esc(j.period) + ' · PM ' +
+      num(j.pm_visits) + '회 · 장비 ' + num(j.instruments) + '대 ' +
+      '(주기가 규칙적인 ' + j.regular + '대로 계산)</p>' +
+      '<h4>PM 후 경과별 고장률 (1000 장비·일당)</h4>' +
+      '<table class="pt"><tbody>' + hz + '</tbody></table>' +
+      '<p class="dim">고장률은 PM 직후가 가장 높고 시간이 지나도 올라가지 않습니다. ' +
+      '즉 주기를 더 조이는 것보다 <b>PM 직후 확인</b>이 효과가 큽니다.</p>' +
+      '<h4>반대로 — 시간이 지나야 나는 Error (정기교체 주기가 중요)</h4>' +
+      '<ul>' + late + '</ul>' +
+      '<div class="note">' + esc(j.basis) + '</div></div></details>';
+
+    view.addEventListener('change', pmOnChange);
+    view.addEventListener('input', pmOnChange);
+    window.scrollTo(0, 0);
+  }).catch(fail);
+}
+
+function pmOnChange(ev) {
+  var t = ev.target, k = t.getAttribute('data-pm');
+  var s = pmState();
+  if (k) {
+    if (t.type === 'checkbox') {
+      s[k] = t.checked;
+      t.closest('.act').classList.toggle('on', t.checked);
+    } else { s[k] = t.value; }
+  } else if (t.id && t.id.indexOf('pf_') === 0) {
+    s['h_' + t.id.slice(3)] = t.value;
+  } else { return; }
+  pmSave(s);
+}
+
+/* 내보내기 — 라이브러리 없이. PDF 는 브라우저 인쇄, 엑셀은 CSV.
+   둘 다 오프라인에서 그대로 된다. */
+function pmRows() {
+  var s = pmState();
+  return PM.items.map(function (it, i) {
+    var done = it.acts.filter(function (a) { return s['pm' + i + '_' + a]; });
+    return { no: i + 1, item: it.item, how: it.how, err: it.err, x: it.x,
+             done: done.join(' '), memo: s['m' + i] || '' };
+  });
+}
+function pmHead() {
+  var s = pmState();
+  return { model: s.h_model || '', serial: s.h_serial || '', fac: s.h_fac || '',
+           date: s.h_date || '', eng: s.h_eng || '' };
+}
+
+function pmCsv() {
+  var h = pmHead(), r = pmRows();
+  var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  var lines = [
+    ['XN-10/11/20/21 PM 후 확인 체크리스트'].map(q).join(','),
+    ['Model', h.model, 'Serial No.', h.serial].map(q).join(','),
+    ['기관', h.fac, 'PM 일자', h.date].map(q).join(','),
+    ['담당 엔지니어', h.eng].map(q).join(','), '',
+    ['#', 'PM 항목', '확인할 것', '수행한 작업', '비고', 'PM 직후 Error', '직후/평소'].map(q).join(','),
+  ];
+  r.forEach(function (x) {
+    lines.push([x.no, x.item, x.how, x.done, x.memo, x.err, x.x + '배'].map(q).join(','));
+  });
+  lines.push('', [PM.basis].map(q).join(','));
+  // 엑셀이 한글을 깨지 않게 BOM 을 붙인다
+  var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  pmDownload(blob, 'PM확인_' + (h.serial || h.model || 'XN') + '_' +
+    (h.date || new Date().toISOString().slice(0, 10)) + '.csv');
+}
+
+/* iPhone 은 a[download] 로 파일이 잘 안 떨어진다. 공유 시트가 되면 그쪽을 쓴다
+   — 메일·파일·메신저로 바로 보낼 수 있어 현장에서 이쪽이 편하다. */
+function pmDownload(blob, name) {
+  var file = null;
+  try { file = new File([blob], name, { type: blob.type }); } catch (e) { /* 구형 */ }
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: name }).catch(function () { pmSaveAs(blob, name); });
+    return;
+  }
+  pmSaveAs(blob, name);
+}
+
+function pmSaveAs(blob, name) {
+  var u = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = u; a.download = name; a.rel = 'noopener';
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 1000);
+}
+
+function pmPdf() {
+  var h = pmHead(), r = pmRows();
+  var rows = r.map(function (x) {
+    return '<tr><td>' + x.no + '</td><td>' + esc(x.item) + '<div class="s">' +
+      esc(x.how) + '</div></td><td>' + esc(x.done || '—') + '</td><td>' +
+      esc(x.memo) + '</td><td>' + esc(x.err) + '<div class="s">' + x.x + '배</div></td></tr>';
+  }).join('');
+  var w = document.createElement('div');
+  w.id = 'pmprint';
+  w.innerHTML =
+    '<h1>XN-10/11/20/21 PM 후 확인 체크리스트</h1>' +
+    '<table class="hd"><tr><td>Model</td><td>' + esc(h.model) + '</td>' +
+    '<td>Serial No.</td><td>' + esc(h.serial) + '</td></tr>' +
+    '<tr><td>기관</td><td>' + esc(h.fac) + '</td><td>PM 일자</td><td>' + esc(h.date) + '</td></tr>' +
+    '<tr><td>담당</td><td colspan="3">' + esc(h.eng) + '</td></tr></table>' +
+    '<table class="bd"><thead><tr><th>#</th><th>PM 항목 · 확인할 것</th>' +
+    '<th>수행</th><th>비고</th><th>PM 직후 Error</th></tr></thead><tbody>' +
+    rows + '</tbody></table>' +
+    '<p class="ft">' + esc(PM.basis) + ' · ' + esc(PM.period) + '</p>';
+  document.body.appendChild(w);
+  document.body.classList.add('printing');
+  var done = function () {
+    document.body.classList.remove('printing');
+    w.remove();
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(function () { if (document.getElementById('pmprint')) done(); }, 60000);
 }
 
 /* ── 오프라인 / 설치 ──────────────────────────────── */
@@ -813,6 +1005,7 @@ function route() {
   if (p[0] === 'q') { qEl.value = p[1] || ''; qx.hidden = !qEl.value; return renderSearch(p[1] || ''); }
   if (p[0] === 'd') return renderDevice(p[1], p[2]);
   if (p[0] === 'e') return renderError(p[1], p[2], p[3]);
+  if (p[0] === 'pm') return renderPM();
   return renderHome();
 }
 
@@ -870,6 +1063,15 @@ document.addEventListener('click', function (ev) {
 
 document.addEventListener('click', function (ev) {
   if (ev.target.id === 'saveAll') precacheAll(ev.target);
+  if (ev.target.closest('[data-go-pm]')) go('pm');
+  if (ev.target.id === 'pmPdf') pmPdf();
+  if (ev.target.id === 'pmCsv') pmCsv();
+  if (ev.target.id === 'pmClear') {
+    if (confirm('체크한 내용을 모두 지웁니다. 계속할까요?')) {
+      try { localStorage.removeItem(PM_KEY); } catch (e) { /* 무시 */ }
+      renderPM();
+    }
+  }
 });
 
 document.addEventListener('change', function (ev) {
