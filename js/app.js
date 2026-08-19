@@ -1,0 +1,837 @@
+/* Sysmex TS Guide — Mobile (Phase 1)
+ *
+ * 원칙
+ *  · 데이터는 build_mobile.py 가 만든 JSON 만 읽는다. UI 는 통계를 만들지 않는다.
+ *  · 전체 Error 상세를 미리 DOM 에 만들지 않는다. 선택한 것만 렌더한다.
+ *  · CRM(현장)과 S/M(공식)은 섹션·색·배지를 달리해 절대 섞지 않는다.
+ *  · Interactive 분기는 Phase 2 이후. 여기서는 steps[] 를 체크리스트로만 보여 준다.
+ *  · 호스팅 경로를 코드에 넣지 않는다 (전부 상대 경로).
+ */
+'use strict';
+
+var DATA = 'data/';
+var META = null;              // devices.json
+var INDEX = null;             // search-index.json (rows) — 첫 화면 뒤에 읽는다
+var INDEXP = null;
+var CACHE = {};               // device/<id>.json 1회 로드 후 보관
+var CASES = {};               // cases/<id>.json — "더 보기" 를 눌렀을 때만 받는다
+var CBOX = null;              // 지금 화면에 열려 있는 사례 묶음 (필터용)
+var RECENT_KEY = 'sysmex-ts-recent';
+
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var SW = null;                // Service Worker 등록 결과
+var view = $('#view'), qEl = $('#q'), qx = $('#qx'), backEl = $('#back');
+var titleEl = $('#title'), subEl = $('#sub'), boot = $('#boot');
+
+/* ── 유틸 ─────────────────────────────────────────── */
+function esc(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+/* 데이터에는 <b> 만 들어 있다 (build_simple 과 같은 규칙) */
+function rich(t) { return esc(t).replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>'); }
+function num(n) { return (n || 0).toLocaleString('ko-KR'); }
+
+function unzipB64(b64) {
+  // gzip 을 base64 로 넣어 둔 블록을 푼다 (단일 파일 빌드 전용)
+  var bin = atob(b64), n = bin.length, buf = new Uint8Array(n), i;
+  for (i = 0; i < n; i++) buf[i] = bin.charCodeAt(i);
+  if (typeof DecompressionStream === 'undefined') {
+    return Promise.reject(new Error('이 브라우저는 압축 해제를 지원하지 않습니다'));
+  }
+  var ds = new DecompressionStream('gzip');
+  var stream = new Blob([buf]).stream().pipeThrough(ds);
+  return new Response(stream).json();
+}
+
+/* ── 잠금 ─────────────────────────────────────────────
+   정적 호스팅에는 서버가 없다. 화면만 가리는 비밀번호는 파일을 직접 받으면
+   그냥 뚫리므로, 데이터 자체를 잠가 두고 여기서 푼다.
+   비밀번호 → PBKDF2 → 키. 키는 서버로 나가지 않는다. */
+var AUTH = null;          // _auth.json (salt·반복수·확인용 조각). 없으면 잠그지 않은 빌드
+var KEY = null;           // CryptoKey — 이 화면에서만 산다
+var KEY_STORE = 'sysmex-ts-key';
+
+function b64buf(s) {
+  var bin = atob(s), n = bin.length, b = new Uint8Array(n), i;
+  for (i = 0; i < n; i++) b[i] = bin.charCodeAt(i);
+  return b;
+}
+function bufb64(b) {
+  var s = '', a = new Uint8Array(b), i;
+  for (i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+  return btoa(s);
+}
+
+function deriveKey(pw) {
+  var enc = new TextEncoder();
+  return crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey'])
+    .then(function (base) {
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: b64buf(AUTH.salt), iterations: AUTH.iter, hash: 'SHA-256' },
+        base, { name: 'AES-GCM', length: 256 }, true, ['decrypt']);
+    });
+}
+
+function openSealed(key, buf) {
+  var a = new Uint8Array(buf);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: a.slice(0, 12) }, key, a.slice(12));
+}
+
+function checkKey(key) {
+  return openSealed(key, b64buf(AUTH.verify).buffer)
+    .then(function () { return true; }, function () { return false; });
+}
+
+/* 현장에서 매번 치게 하면 쓰지 않게 된다. 이 기기에 키를 넣어 두되 기한을 준다. */
+function rememberKey(key) {
+  return crypto.subtle.exportKey('raw', key).then(function (raw) {
+    try {
+      localStorage.setItem(KEY_STORE, JSON.stringify(
+        { k: bufb64(raw), until: Date.now() + 30 * 864e5, salt: AUTH.salt }));
+    } catch (e) { /* 저장 못 해도 이번 세션은 돈다 */ }
+  });
+}
+
+function recallKey() {
+  var s;
+  try { s = JSON.parse(localStorage.getItem(KEY_STORE) || 'null'); } catch (e) { return null; }
+  if (!s || s.until < Date.now() || s.salt !== AUTH.salt) return null;   // 비밀번호가 바뀌면 salt 가 바뀐다
+  return crypto.subtle.importKey('raw', b64buf(s.k), 'AES-GCM', true, ['decrypt']);
+}
+
+function forgetKey() {
+  try { localStorage.removeItem(KEY_STORE); } catch (e) { /* 무시 */ }
+}
+
+function getJSON(path) {
+  // 단일 파일 빌드: 데이터가 문서 안에 들어 있다.
+  // 문서에 박혀 있어도 여기서 부르기 전까지는 파싱 비용이 들지 않는다.
+  var z = document.getElementById('tsz:' + path);
+  if (z) return unzipB64(z.textContent.trim());
+  var el = document.getElementById('ts:' + path);
+  if (el) {
+    return new Promise(function (ok, no) {
+      try { ok(JSON.parse(el.textContent)); } catch (e) { no(e); }
+    });
+  }
+  if (AUTH && KEY) {
+    return fetch(DATA + path + '.enc', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error(path + ' ' + r.status);
+      return r.arrayBuffer();
+    }).then(function (buf) {
+      return openSealed(KEY, buf);
+    }).then(function (raw) {
+      // 잠그기 전에 gzip 으로 줄여 두었다 (암호문은 압축이 안 되므로 순서가 그렇다)
+      if (!AUTH.gz) return JSON.parse(new TextDecoder().decode(raw));
+      return new Response(new Blob([raw]).stream()
+        .pipeThrough(new DecompressionStream('gzip'))).json();
+    });
+  }
+  return fetch(DATA + path, { cache: 'no-cache' }).then(function (r) {
+    if (!r.ok) throw new Error(path + ' ' + r.status);
+    return r.json();
+  });
+}
+
+function recall() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch (e) { return []; }
+}
+function remember(q) {
+  if (!q || q.length < 2) return;
+  try {
+    var a = recall().filter(function (x) { return x !== q; });
+    a.unshift(q);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(a.slice(0, 8)));
+  } catch (e) { /* 사파리 프라이빗 모드 등 — 저장 못 해도 앱은 돈다 */ }
+}
+
+function devOf(id) {
+  for (var i = 0; i < META.devices.length; i++) {
+    if (META.devices[i].id === id) return META.devices[i];
+  }
+  return null;
+}
+
+function loadDevice(id) {
+  if (CACHE[id]) return Promise.resolve(CACHE[id]);
+  var d = devOf(id);
+  if (!d) return Promise.reject(new Error('unknown device ' + id));
+  return getJSON(d.file).then(function (j) { CACHE[id] = j; return j; });
+}
+
+/* ── 검색 ─────────────────────────────────────────── */
+/* 신호 세기 순으로 점수를 준다 — 코드 완전일치 > 제목 > 부품·조치 > 매뉴얼 본문.
+   순위 규칙은 여기 한 곳에만 있고, 근거 필드는 인덱스가 제공한다. */
+function score(row, q) {
+  var i, c;
+  for (i = 0; i < row.c.length; i++) {
+    c = String(row.c[i]).toLowerCase();
+    if (c === q) return 1000;
+    if (c.indexOf(q) === 0) return 900;
+  }
+  var k1 = row.k1 || '';
+  if (k1.indexOf(q) === 0) return 800;
+  if ((' ' + k1).indexOf(' ' + q) >= 0) return 700;
+  if (k1.indexOf(q) >= 0) return 600;
+  var k2 = row.k2 || '';
+  if ((' ' + k2).indexOf(' ' + q) >= 0) return 400;
+  if (k2.indexOf(q) >= 0) return 300;
+  var k3 = row.k3 || '';
+  if (k3.indexOf(q) >= 0) return 100;
+  return 0;
+}
+
+function ensureIndex() {
+  if (!INDEXP) {
+    INDEXP = getJSON('search-index.json').then(function (j) {
+      INDEX = j.rows;
+      return INDEX;
+    });
+  }
+  return INDEXP;
+}
+
+function search(q, devFilter, limit) {
+  q = String(q || '').trim().toLowerCase();
+  if (!q) return [];
+  var out = [], i, s, r;
+  for (i = 0; i < INDEX.length; i++) {
+    r = INDEX[i];
+    if (devFilter && r.d !== devFilter) continue;
+    s = score(r, q);
+    if (s) out.push({ s: s, r: r });
+  }
+  out.sort(function (a, b) {
+    if (b.s !== a.s) return b.s - a.s;
+    if (a.r.p !== b.r.p) return a.r.p - b.r.p;   // Part 1(사람이 쓴 것) 우선
+    return b.r.n - a.r.n;                        // 그다음 발생 건수
+  });
+  return out.slice(0, limit || 60).map(function (x) { return x.r; });
+}
+
+/* ── 조각 렌더 ─────────────────────────────────────── */
+function rowHTML(r) {
+  var codes = (r.c && r.c.length) ? r.c.slice(0, 2).join(' / ') : '';
+  var tags = '<span class="tag dv">' + esc(r.d) + '</span>';
+  tags += codes ? '<span class="tag cd">' + esc(codes) + '</span>'
+                : '<span class="tag no">코드 없음</span>';
+  if (r.r != null) {
+    tags += '<span class="tag rc' + (r.r >= 55 ? ' hi' : '') + '">재발 ' + r.r + '%</span>';
+  }
+  if (r.p === 2) tags += '<span class="tag p2">전체</span>';
+  return '<button class="row" data-go="' + r.d + '/' + r.p + '/' + r.i + '">' +
+    '<span class="r1"><span class="t">' + esc(r.t) + '</span>' +
+    '<span class="n">' + num(r.n) + '건</span></span>' +
+    '<span class="r2">' + tags +
+    (r.cz ? '<span class="cz">' + esc(r.cz) + '</span>' : '') +
+    '</span></button>';
+}
+
+function listHTML(rows, emptyMsg) {
+  if (!rows.length) return '<div class="card"><div class="empty">' + esc(emptyMsg) + '</div></div>';
+  return '<div class="card rows">' + rows.map(rowHTML).join('') + '</div>';
+}
+
+/* ── 화면 1: Home ─────────────────────────────────── */
+function renderHome() {
+  titleEl.textContent = 'Sysmex TS Guide';
+  subEl.textContent = META.devices.length + '개 장비 · 데이터 ' + META.v;
+  backEl.hidden = true;
+
+  var devs = META.devices.map(function (d) {
+    return '<button class="dev" data-dev="' + d.id + '"><b>' + esc(d.name) + '</b>' +
+      '<i>' + d.counts.p1 + ' + ' + d.counts.p2 + '</i></button>';
+  }).join('');
+
+  var rec = recall();
+  var recHTML = rec.length
+    ? '<div class="sec"><h2>최근 검색</h2><div class="recent">' +
+      rec.map(function (q) {
+        return '<button data-q="' + esc(q) + '">' + esc(q) + '</button>';
+      }).join('') + '</div></div>'
+    : '';
+
+  var hot = (META.hot || []).map(function (h) {
+    return rowHTML({ d: h.d, p: h.p, i: h.i, t: h.en, c: h.c, n: h.n, r: h.r, cz: '' });
+  }).join('');
+
+  view.innerHTML =
+    '<div class="sec"><h2>장비</h2><div class="devs">' + devs + '</div></div>' +
+    recHTML +
+    '<div class="sec"><h2>자주 발생하는 Error</h2>' +
+    '<div class="card rows">' + hot + '</div>' +
+    '<p class="muted">발생 건수 기준 상위입니다. 장비를 고르면 그 장비의 전체 목록이 나옵니다.</p></div>' +
+    offlineCardHTML();
+}
+
+/* ── 오프라인 / 설치 ──────────────────────────────── */
+function offlineCardHTML() {
+  if (!('serviceWorker' in navigator)) return '';
+  var saved = localStorage.getItem('ts-offline-v');
+  var ok = saved === META.v;
+  return '<div class="sec"><h2>오프라인</h2><div class="card off">' +
+    '<div class="offr"><span class="dot ' + (ok ? 'on' : '') + '"></span>' +
+    '<span>' + (ok ? '이 기기에 전부 저장돼 있습니다 — 인터넷 없이 사용 가능'
+                   : '아직 전부 저장하지 않았습니다') + '</span></div>' +
+    '<button class="obtn" id="saveAll">' +
+    (ok ? '다시 받기' : '오프라인용으로 전부 저장') + '</button>' +
+    '<p class="muted">현장에 나가기 전에 한 번 눌러 두면 인터넷이 없어도 전부 열립니다. ' +
+    '데이터 ' + esc(META.v) + '</p></div></div>';
+}
+
+function banner(html, action, label) {
+  var b = document.getElementById('banner');
+  if (!b) return;
+  b.hidden = false;
+  b.innerHTML = '<span>' + html + '</span>' +
+    (label ? '<button id="bnact">' + esc(label) + '</button>' : '') +
+    '<button class="bx" id="bnx" aria-label="닫기">✕</button>';
+  var a = document.getElementById('bnact');
+  if (a) a.onclick = action;
+  document.getElementById('bnx').onclick = function () { b.hidden = true; };
+}
+
+function precacheAll(btn) {
+  if (!SW || !SW.active) { alert('오프라인 저장을 아직 쓸 수 없습니다. 잠시 후 다시 시도하십시오.'); return; }
+  btn.disabled = true;
+  btn.textContent = '저장 중… 0%';
+  SW.active.postMessage({ type: 'PRECACHE_ALL' });
+}
+
+function initSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').then(function (reg) {
+    SW = reg;
+    reg.addEventListener('updatefound', function () {
+      var nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', function () {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          banner('새 데이터가 있습니다.', function () {
+            nw.postMessage({ type: 'SKIP_WAITING' });
+            location.reload();
+          }, '받기');
+        }
+      });
+    });
+  }).catch(function () { /* http:// 로컬 테스트 등 — 앱은 그대로 돈다 */ });
+
+  navigator.serviceWorker.addEventListener('message', function (ev) {
+    var m = ev.data || {};
+    var btn = document.getElementById('saveAll');
+    if (m.type === 'PRECACHE' && btn) {
+      btn.textContent = '저장 중… ' + Math.round(m.done / m.total * 100) + '%';
+    }
+    if (m.type === 'PRECACHE_DONE') {
+      localStorage.setItem('ts-offline-v', META.v);
+      if (location.hash === '' || location.hash === '#/') renderHome();
+    }
+  });
+
+  window.addEventListener('offline', function () {
+    banner('오프라인입니다. 저장해 둔 자료로 계속 볼 수 있습니다.');
+  });
+}
+
+/* ── 화면 2: 장비별 목록 ───────────────────────────── */
+function renderDevice(id, tab) {
+  var d = devOf(id);
+  if (!d) return go('');
+  titleEl.textContent = d.name;
+  subEl.textContent = d.label;
+  backEl.hidden = false;
+  view.innerHTML = '<div class="card"><div class="empty">불러오는 중…</div></div>';
+
+  loadDevice(id).then(function (j) {
+    if (location.hash.indexOf('#/d/' + id) !== 0) return;   // 이미 다른 화면으로 이동
+    tab = tab === '2' ? '2' : '1';
+    var items = j.list[tab === '2' ? 'p2' : 'p1'];
+    var rows = items.map(function (x) {
+      return { d: id, p: Number(tab), i: x.i, t: x.en, c: x.c, n: x.n, r: x.r, cz: x.cz };
+    });
+    view.innerHTML =
+      '<div class="tabs">' +
+      '<button data-tab="1" class="' + (tab === '1' ? 'on' : '') + '">주요 Error ' +
+      d.counts.p1 + '</button>' +
+      '<button data-tab="2" class="' + (tab === '2' ? 'on' : '') + '">전체 Error ' +
+      d.counts.p2 + '</button></div>' +
+      listHTML(rows, '항목이 없습니다') +
+      '<p class="muted">' + esc(d.period) + ' · 고장 수리 · PM ' + num(d.visits) + '회 방문' +
+      (d.manual ? ' · 매뉴얼 ' + esc(d.manual) : ' · S/M 미확보') + '</p>';
+  }).catch(fail);
+}
+
+/* ── 화면 3: Error 상세 ────────────────────────────── */
+function bar(cs) {
+  if (!cs || !cs.items || !cs.items.length) return '';
+  var max = cs.items[0].pct || 1;
+  return '<div class="share">' + cs.items.slice(0, 5).map(function (x) {
+    return '<div class="b"><span class="nm">' + esc(x.t) + '</span>' +
+      '<span class="bar"><i style="width:' + Math.round(x.pct / max * 100) + '%"></i></span>' +
+      '<span class="pc">' + x.pct + '%</span></div>';
+  }).join('') +
+    '<p class="muted">CRM 첫 조치 ' + num(cs.total) + '건의 분포입니다. ' +
+    '조치에서 역산한 <b>추정</b>이며 원인 판정 결과가 아닙니다.</p></div>';
+}
+
+function stagesHTML(steps) {
+  if (!steps || !steps.length) return '<div class="empty">조치 기록이 없습니다</div>';
+  return steps.map(function (s, si) {
+    var cls = s.kind === 0 ? 'sm0' : (s.kind === 1 ? 's1' : 's2');
+    var no = s.kind === 0 ? '·' : String(s.kind);
+    var items = (s.items || []).map(function (it, ii) {
+      var id = 'c' + si + '_' + ii;
+      return '<label class="chk" for="' + id + '">' +
+        '<input type="checkbox" id="' + id + '"><span>' + rich(it) + '</span></label>';
+    }).join('');
+    return '<div class="stage ' + cls + '"><div class="sh"><span class="no">' + no +
+      '</span>' + esc(s.label) + '</div>' + items + '</div>';
+  }).join('');
+}
+
+function smHTML(e) {
+  var m = e.manual || {}, o = e.overview || {};
+  var has = m.title || (m.causes || []).length || (m.actions || []).length ||
+            (o.reasons || []).length;
+  if (!has) {
+    return '<details class="acc sm"><summary>S/M Standard' +
+      '<span class="src">공식</span></summary><div class="body">' +
+      '<p class="note">이 Error 는 Service Manual 과 연결되지 않았습니다. ' +
+      '없는 내용을 채우지 않았습니다.</p></div></details>';
+  }
+  var b = '';
+  var codes = (e.codes && e.codes.length) ? e.codes : (e.code ? [e.code] : []);
+  if (codes.length) b += '<h4>Error Code</h4><p>' + esc(codes.join(' / ')) + '</p>';
+  if (o.etype || o.elevel) {
+    b += '<h4>구분</h4><p>' + esc([o.etype, o.elevel].filter(Boolean).join(' · ')) + '</p>';
+  }
+  if (m.meaning) b += '<h4>Meaning</h4><p>' + esc(m.meaning) + '</p>';
+  if ((o.reasons || []).length) {
+    b += '<h4>검출 조건</h4><ul>' +
+      o.reasons.slice(0, 4).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  }
+  if ((m.causes || []).length) {
+    b += '<h4>Probable Cause</h4><ul>' +
+      m.causes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  }
+  if ((m.actions || []).length) {
+    b += '<h4>Action (매뉴얼 표준 조치)</h4><ul>' +
+      m.actions.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  }
+  if ((m.parts || []).length) {
+    b += '<h4>S/M 부품 P/N</h4><p>' + esc(m.parts.slice(0, 6).join(' · ')) + '</p>';
+  }
+  if (m.note) b += '<div class="note">' + rich(m.note) + '</div>';
+  return '<details class="acc sm"><summary>S/M Standard<span class="src">공식</span>' +
+    '</summary><div class="body">' + b + '</div></details>';
+}
+
+function crmHTML(e) {
+  var c = e.crm || {};
+  var b = '';
+  if (e.cause) b += '<p>' + rich(e.cause) + '</p>';
+  b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps);
+  if (e.verify) b += '<h4>조치 후 확인</h4><p>' + rich(e.verify) + '</p>';
+  if (e.caution) b += '<h4>주의사항</h4><p>' + rich(e.caution) + '</p>';
+  b += '<div class="note">여기 순서는 <b>현장에서 실제로 한 순서</b>를 집계한 것입니다. ' +
+       'S/M 이 규정한 표준 절차가 아닙니다.</div>';
+  return '<details class="acc crm" open><summary>CRM Actual<span class="src">현장</span>' +
+    '</summary><div class="body">' + b + '</div></details>';
+}
+
+function partsHTML(e) {
+  var c = e.crm || {};
+  var pn = c.pn || [], named = c.named || [], sens = c.sensors || [];
+  if (!pn.length && !named.length && !sens.length) return '';
+  var b = '';
+  if (pn.length) {
+    b += '<h4>실제 청구 부품 (부품 CRM)</h4><table class="pt"><tbody>' +
+      pn.slice(0, 10).map(function (r) {
+        return '<tr><td class="nm">' + esc(r.name) +
+          (r.pn ? '<span class="pn">' + esc(r.pn) + '</span>' : '') +
+          '</td><td class="q">' + num(r.n) + '건</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  if (named.length) {
+    b += '<h4>작업 기록 표기 (P/N 아님)</h4><div class="chips">' +
+      named.slice(0, 8).map(function (x) {
+        return '<span class="chip">' + esc(x[0]) + '<i>' + x[1] + '</i></span>';
+      }).join('') + '</div>';
+  }
+  if (sens.length) {
+    b += '<h4>센서</h4><div class="chips">' +
+      sens.slice(0, 8).map(function (x) {
+        return '<span class="chip">' + esc(x[0]) + '<i>' + x[1] + '</i></span>';
+      }).join('') + '</div>';
+  }
+  b += '<div class="note">건수는 그 Part 가 이 Error 방문에서 청구된 <b>방문 수</b>입니다. ' +
+       '발주 전 P/N 을 다시 확인하십시오.</div>';
+  return '<details class="acc crm"><summary>Related Parts<span class="src">현장</span>' +
+    '</summary><div class="body">' + b + '</div></details>';
+}
+
+function relatedHTML(e, dev) {
+  var co = e.co || [];
+  if (!co.length) return '';
+  var chips = co.map(function (x) {
+    return '<button class="chip" data-find="' + esc(x[0]) + '">' + esc(x[0]) +
+      '<i>' + x[1] + '</i></button>';
+  }).join('');
+  return '<details class="acc dat"><summary>Related Errors<span class="src">데이터</span>' +
+    '</summary><div class="body"><h4>같은 방문에 함께 기록된 Error</h4>' +
+    '<div class="chips">' + chips + '</div>' +
+    '<div class="note">함께 뜬 것이지 인과관계가 확인된 것은 아닙니다.</div>' +
+    '</div></details>';
+}
+
+function quoteHTML(r) {
+  return '<blockquote><em>' + esc(r.date) + ' · ' + esc(r.inst) + ' · ' + esc(r.model) +
+    '</em>' + esc(r.text) + '</blockquote>';
+}
+
+function recordsHTML(e, more) {
+  var rs = e.records || [];
+  if (!rs.length && !e.quote) return '';
+  if (!rs.length && e.quote) rs = [e.quote];
+  var b = rs.slice(0, 3).map(quoteHTML).join('');
+  var btn = more ? '<button class="more" id="moreCases" data-n="' + more +
+    '">비슷한 사례 ' + more + '건 더 보기</button>' : '';
+  return '<details class="acc crm"><summary>작업 기록 원문<span class="src">현장</span>' +
+    '</summary><div class="body"><div id="cwrap">' + b + '</div>' + btn +
+    '<div class="note">CRM 작업 내용을 <b>고치지 않고</b> 그대로 옮긴 것입니다.</div>' +
+    '</div></details>';
+}
+
+/* 사례를 "더" 가 아니라 "다르게" 보여 준다.
+   손댄 구성품·교체 여부로 걸러 볼 수 있게 칩을 만든다. 칩은 데이터에서 나온 것만 쓴다. */
+function chipsOf(cases) {
+  var cnt = {}, i, j, c;
+  for (i = 0; i < cases.length; i++) {
+    c = cases[i];
+    for (j = 0; j < (c.tags || []).length; j++) bump(c.tags[j]);
+    for (j = 0; j < (c.comps || []).length; j++) bump(c.comps[j]);
+  }
+  function bump(k) { cnt[k] = (cnt[k] || 0) + 1; }
+  // 전부에 붙은 칩은 걸러 낼 것이 없으니 뺀다
+  return Object.keys(cnt)
+    .filter(function (k) { return cnt[k] >= 2 && cnt[k] < cases.length; })
+    .sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 8)
+    .map(function (k) { return { k: k, n: cnt[k] }; });
+}
+
+function casesListHTML(cases, sel) {
+  var use = cases.filter(function (c) {
+    if (!sel) return true;
+    return (c.tags || []).indexOf(sel) >= 0 || (c.comps || []).indexOf(sel) >= 0;
+  });
+  if (!use.length) return '<div class="empty">해당하는 사례가 없습니다</div>';
+  return use.map(function (c) {
+    var tg = (c.tags || []).concat(c.valves || []).map(function (t) {
+      return '<span class="chip sm">' + esc(t) + '</span>';
+    }).join('');
+    return '<blockquote><em>' + esc(c.date) + ' · ' + esc(c.inst) + ' · ' + esc(c.model) +
+      '</em>' + esc(c.text) + (tg ? '<div class="chips">' + tg + '</div>' : '') +
+      '</blockquote>';
+  }).join('');
+}
+
+function openCases(dev, file, key, idx, btn) {
+  btn.disabled = true;
+  btn.textContent = '불러오는 중…';
+  var p = CASES[dev] ? Promise.resolve(CASES[dev])
+                     : getJSON(file).then(function (j) { CASES[dev] = j; return j; });
+  p.then(function (j) {
+    var box = ((j.items || {})[key] || {})[idx];
+    if (!box) { btn.textContent = '사례가 없습니다'; return; }
+    CBOX = box;
+    var chips = chipsOf(box.cases);
+    var host = document.createElement('div');
+    host.className = 'cases';
+    host.innerHTML =
+      '<div class="note">아래는 같은 Error 로 기록된 <b>' + box.pool +
+      '건</b> 중 접근이 서로 다른 <b>' + box.cases.length + '건</b>입니다. ' +
+      '많이 나온 순서가 아니라 <b>손댄 곳이 겹치지 않는 순서</b>로 골랐습니다.</div>' +
+      (chips.length ? '<div class="chips filt"><button class="chip on" data-f="">전체</button>' +
+        chips.map(function (c) {
+          return '<button class="chip" data-f="' + esc(c.k) + '">' + esc(c.k) +
+            ' <i>' + c.n + '</i></button>';
+        }).join('') + '</div>' : '') +
+      '<div id="clist">' + casesListHTML(box.cases, '') + '</div>';
+    btn.parentNode.replaceChild(host, btn);
+    var f = host.querySelector('.filt');
+    if (f) {
+      f.addEventListener('click', function (ev) {
+        var t = ev.target.closest ? ev.target.closest('button') : null;
+        if (!t) return;
+        var all = f.querySelectorAll('button'), i;
+        for (i = 0; i < all.length; i++) all[i].className = 'chip';
+        t.className = 'chip on';
+        $('#clist', host).innerHTML = casesListHTML(CBOX.cases, t.getAttribute('data-f'));
+      });
+    }
+  }).catch(function () {
+    btn.disabled = false;
+    btn.textContent = '사례를 불러오지 못했습니다 — 다시 시도';
+  });
+}
+
+function dataHTML(e) {
+  var r = e.recur || {}, b = '';
+  if (r.base >= 10) {
+    b += '<h4>재발</h4><p>같은 Serial 30일 내 <b>' + r.p30 + '%</b> · 90일 ' + r.p90 +
+      '% <span class="muted">(판정 ' + r.base + '건)</span></p>';
+  }
+  if (e.models) b += '<h4>모델 분포</h4><p>' + esc(e.models) + '</p>';
+  var v = (e.valves && e.valves.crm) || e.valve || [];
+  if (v.length) {
+    b += '<h4>Valve No.</h4><div class="chips">' +
+      v.slice(0, 10).map(function (x) { return '<span class="chip">' + esc(x) + '</span>'; }).join('') +
+      '</div>';
+  }
+  if ((e.crm || {}).skipped) {
+    b += '<div class="note">이 Error 로 기록된 방문 중 <b>' + e.crm.skipped +
+      '건</b>은 작업 내용에서 이 Error 와 이어지는 구간을 찾지 못해 집계에서 제외했습니다.</div>';
+  }
+  if (!b) return '';
+  return '<details class="acc dat"><summary>Data<span class="src">데이터</span>' +
+    '</summary><div class="body">' + b + '</div></details>';
+}
+
+function renderError(dev, part, idx) {
+  var d = devOf(dev);
+  if (!d) return go('');
+  backEl.hidden = false;
+  view.innerHTML = '<div class="card"><div class="empty">불러오는 중…</div></div>';
+
+  loadDevice(dev).then(function (j) {
+    var key = part === '2' ? 'p2' : 'p1';
+    var e = j.detail[key][idx];
+    if (!e) { view.innerHTML = '<div class="card"><div class="empty">항목을 찾지 못했습니다</div></div>'; return; }
+
+    titleEl.textContent = e.en;
+    subEl.textContent = d.name + ' · ' + (part === '2' ? '전체 Error' : '주요 Error');
+
+    var codes = (e.codes && e.codes.length) ? e.codes : (e.code ? [e.code] : []);
+    var r = e.recur || {};
+    var stats =
+      '<div class="stat"><b>' + num(e.n) + '건</b><span>발생</span></div>' +
+      (e.share != null ? '<div class="stat"><b>' + e.share + '%</b><span>전체 대비</span></div>' : '') +
+      (r.base >= 10 ? '<div class="stat"><b>' + r.p30 + '%</b><span>30일 재발</span></div>' : '') +
+      ((e.crm || {}).base != null ?
+        '<div class="stat"><b>' + num(e.crm.base) + '건</b><span>작업 기록</span></div>' : '');
+
+    var head =
+      '<div class="card head">' +
+      '<div class="r2" style="margin:0 0 7px">' +
+      '<span class="tag dv">' + esc(dev) + '</span>' +
+      (codes.length ? '<span class="tag cd">' + esc(codes.join(' / ')) + '</span>'
+                    : '<span class="tag no">코드 없음</span>') +
+      (part === '2' ? '<span class="tag p2">전체</span>' : '') + '</div>' +
+      '<h1>' + esc(e.en) + '</h1>' +
+      (e.ko ? '<p class="ko">' + esc(e.ko) + '</p>' : '') +
+      '<div class="stats">' + stats + '</div>' +
+      bar(e.cause_share) +
+      ((e.steps && e.steps.length)
+        ? '<button class="cta" id="startTs">Troubleshooting 시작</button>' : '') +
+      '</div>';
+
+    var more = ((j.cn || {})[key] || {})[idx] || 0;
+    view.innerHTML = head + smHTML(e) + crmHTML(e) + partsHTML(e) +
+      relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e);
+    var mb = $('#moreCases');
+    if (mb) {
+      mb.addEventListener('click', function () {
+        openCases(dev, j.cases_file, key, idx, mb);
+      });
+    }
+    window.scrollTo(0, 0);
+  }).catch(fail);
+}
+
+/* ── 화면 4: 검색 결과 ─────────────────────────────── */
+function renderSearch(q) {
+  titleEl.textContent = '검색';
+  subEl.textContent = '"' + q + '"';
+  backEl.hidden = false;
+  if (!INDEX) {
+    view.innerHTML = '<div class="card"><div class="empty">검색 준비 중…</div></div>';
+    ensureIndex().then(function () {
+      if (decodeURIComponent(location.hash).indexOf('#/q/' + q) === 0) renderSearch(q);
+    }).catch(fail);
+    return;
+  }
+  var rows = search(q, null, 60);
+  view.innerHTML =
+    '<p class="muted" style="margin:0 0 8px">' + rows.length + '건' +
+    (rows.length >= 60 ? ' (상위 60건만 표시)' : '') + '</p>' +
+    listHTML(rows, '결과가 없습니다. Error 이름 일부 · Code · Part No. · Valve 번호로 찾아보십시오.');
+}
+
+/* ── 라우팅 ───────────────────────────────────────── */
+function go(hash) { location.hash = hash ? '#/' + hash : '#/'; }
+
+function route() {
+  var h = (location.hash || '#/').replace(/^#\/?/, '');
+  var p = h.split('/').filter(Boolean).map(decodeURIComponent);
+  if (!p.length) { qEl.value = ''; qx.hidden = true; return renderHome(); }
+  if (p[0] === 'q') { qEl.value = p[1] || ''; qx.hidden = !qEl.value; return renderSearch(p[1] || ''); }
+  if (p[0] === 'd') return renderDevice(p[1], p[2]);
+  if (p[0] === 'e') return renderError(p[1], p[2], p[3]);
+  return renderHome();
+}
+
+function fail(err) {
+  view.innerHTML = '<div class="card"><div class="empty">데이터를 불러오지 못했습니다.<br>' +
+    esc(err && err.message) + '</div></div>';
+}
+
+/* ── 이벤트 ───────────────────────────────────────── */
+var tmr = null;
+qEl.addEventListener('input', function () {
+  qx.hidden = !qEl.value;
+  clearTimeout(tmr);
+  tmr = setTimeout(function () {
+    var v = qEl.value.trim();
+    if (!v) { if (location.hash.indexOf('#/q/') === 0) go(''); return; }
+    var target = '#/q/' + encodeURIComponent(v);
+    if (location.hash.indexOf('#/q/') === 0) {
+      history.replaceState(null, '', target);       // 타이핑 중에는 히스토리를 쌓지 않는다
+      renderSearch(v);
+    } else {
+      location.hash = target;
+    }
+  }, 120);
+});
+qEl.addEventListener('change', function () { remember(qEl.value.trim()); });
+qEl.addEventListener('keydown', function (ev) {
+  if (ev.key === 'Enter') { remember(qEl.value.trim()); qEl.blur(); }
+});
+qx.addEventListener('click', function () { qEl.value = ''; qx.hidden = true; qEl.focus(); go(''); });
+backEl.addEventListener('click', function () {
+  if (history.length > 1) history.back(); else go('');
+});
+
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest('[data-go],[data-dev],[data-tab],[data-q],[data-find],#startTs');
+  if (!t) return;
+  if (t.id === 'startTs') {
+    var s = document.querySelector('details.crm');
+    if (s) { s.open = true; s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    return;
+  }
+  if (t.dataset.go) { go('e/' + t.dataset.go); return; }
+  if (t.dataset.dev) { go('d/' + t.dataset.dev); return; }
+  if (t.dataset.tab) { go('d/' + location.hash.split('/')[2] + '/' + t.dataset.tab); return; }
+  if (t.dataset.q) { qEl.value = t.dataset.q; go('q/' + encodeURIComponent(t.dataset.q)); return; }
+  if (t.dataset.find) { qEl.value = t.dataset.find; go('q/' + encodeURIComponent(t.dataset.find)); }
+});
+
+document.addEventListener('click', function (ev) {
+  if (ev.target.id === 'saveAll') precacheAll(ev.target);
+});
+
+document.addEventListener('change', function (ev) {
+  if (ev.target.matches('.chk input')) {
+    ev.target.closest('.chk').classList.toggle('done', ev.target.checked);
+  }
+});
+
+window.addEventListener('hashchange', route);
+
+/* ── 잠금 화면 ─────────────────────────────────────── */
+function askPassword(msg) {
+  boot.remove();
+  titleEl.textContent = 'Sysmex TS Guide';
+  subEl.textContent = '';
+  backEl.hidden = true;
+  document.body.classList.add('locked');
+  view.innerHTML =
+    '<div class="card lock">' +
+    '<h2>비밀번호</h2>' +
+    '<p class="muted">현장 배포용 비밀번호를 넣어 주십시오. 이 기기에서 한 번만 하면 됩니다.</p>' +
+    (msg ? '<div class="lockerr">' + esc(msg) + '</div>' : '') +
+    '<form id="lockf" autocomplete="on">' +
+    '<input type="text" name="username" value="sysmex-fsg" autocomplete="username" hidden>' +
+    '<input type="password" id="pw" autocomplete="current-password" ' +
+    'placeholder="비밀번호" autocapitalize="off" autocorrect="off" spellcheck="false">' +
+    '<label class="rem"><input type="checkbox" id="rem" checked> 이 기기에서 30일간 기억</label>' +
+    '<button class="cta" type="submit" id="pwgo">열기</button>' +
+    '</form>' +
+    '<div class="note">데이터는 비밀번호로 잠겨 있습니다. 비밀번호는 이 기기 밖으로 나가지 않습니다.</div>' +
+    '</div>';
+  $('#pw').focus();
+  $('#lockf').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var pw = $('#pw').value, keep = $('#rem').checked, btn = $('#pwgo');
+    if (!pw) return;
+    btn.disabled = true;
+    btn.textContent = '확인 중…';           // PBKDF2 는 일부러 느리다 (대입 방어)
+    setTimeout(function () {
+      deriveKey(pw).then(function (k) {
+        return checkKey(k).then(function (good) {
+          if (!good) {
+            btn.disabled = false; btn.textContent = '열기';
+            askPassword('비밀번호가 맞지 않습니다.');
+            return;
+          }
+          KEY = k;
+          document.body.classList.remove('locked');
+          return (keep ? rememberKey(k) : Promise.resolve()).then(start);
+        });
+      }).catch(function (e) {
+        btn.disabled = false; btn.textContent = '열기';
+        askPassword('열지 못했습니다 — ' + e.message);
+      });
+    }, 30);                                  // 버튼 글자가 바뀐 뒤에 계산을 시작한다
+  });
+}
+
+/* ── 시작 ─────────────────────────────────────────── */
+function start() {
+  if (window.__step) window.__step('③ 앱 코드 시작 — 장비 목록 읽는 중');
+  return getJSON('devices.json')
+    .then(function (m) {
+      META = m;
+      if (window.__step) window.__step('④ 장비 목록 읽음 — 화면 그리는 중');
+      if (boot.parentNode) boot.remove();
+      route();                                  // 홈은 여기서 이미 보인다
+      var idle = window.requestIdleCallback ||
+                 function (f) { return setTimeout(f, 1); };
+      idle(function () { ensureIndex(); initSW(); });   // 검색 인덱스·오프라인 준비는 뒤이어
+    })
+    .catch(function (err) {
+      if (AUTH) {                               // 키가 상했을 수 있다 — 다시 묻는다
+        forgetKey(); KEY = null;
+        askPassword('데이터를 열지 못했습니다. 비밀번호를 다시 넣어 주십시오.');
+        return;
+      }
+      if (boot.parentNode) {
+        boot.className = 'boot err';
+        boot.innerHTML = '데이터를 불러오지 못했습니다.<br><b>' + esc(err.message) + '</b><br><br>' +
+          '<small>' + esc(navigator.userAgent) + '</small><br><br>' +
+          'file:// 로 직접 열면 브라우저가 JSON 읽기를 막습니다.<br>' +
+          '이 폴더에서 <code>python -m http.server 8000</code> 을 실행한 뒤<br>' +
+          '<code>http://localhost:8000/</code> 로 접속하십시오.';
+      }
+    });
+}
+
+// 잠긴 빌드인지 먼저 본다. _auth.json 이 없으면 예전처럼 그냥 연다.
+fetch(DATA + '_auth.json', { cache: 'no-cache' })
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .catch(function () { return null; })
+  .then(function (a) {
+    if (!a || !window.crypto || !crypto.subtle) return start();
+    AUTH = a;
+    var p = recallKey();
+    if (!p) return askPassword('');
+    return Promise.resolve(p).then(function (k) {
+      return checkKey(k).then(function (good) {
+        if (!good) { forgetKey(); return askPassword(''); }
+        KEY = k;
+        return start();
+      });
+    }).catch(function () { forgetKey(); return askPassword(''); });
+  });

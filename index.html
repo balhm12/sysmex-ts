@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#1d4e89">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TS Guide">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Sysmex TS Guide</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="alternate icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231d4e89%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2216%22 font-family=%22Arial%22 font-weight=%22bold%22 fill=%22%23fff%22 text-anchor=%22middle%22%3ETS%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header id="top">
+  <div class="bar">
+    <button id="back" class="icon" aria-label="뒤로" hidden>‹</button>
+    <div class="brand">
+      <b id="title">Sysmex TS Guide</b>
+      <span id="sub"></span>
+    </div>
+  </div>
+  <div class="sbox">
+    <input id="q" type="search" enterkeyhint="search" autocomplete="off"
+           placeholder="Error · Code · Part No. · Sensor · Valve 검색">
+    <button id="qx" class="icon" aria-label="지우기" hidden>✕</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+<main id="view" aria-live="polite"></main>
+
+<div id="boot" class="boot">
+  <p id="bootmsg">① 파일 열림 — 자바스크립트 대기 중</p>
+</div>
+<script>
+/* 어디까지 진행됐는지 화면에 남긴다. 여기서 멈추면 그 단계가 문제다. */
+window.__step = function (t) {
+  var el = document.getElementById('bootmsg');
+  if (el) el.innerHTML = t;
+};
+window.__step('② 자바스크립트 실행됨 — 데이터 읽는 중');
+window.onerror = function (msg, src, line) {
+  var el = document.getElementById('boot');
+  if (!el) return;
+  el.className = 'boot err';
+  el.innerHTML = '오류가 생겼습니다.<br><b>' + String(msg) + '</b><br>' +
+                 (line ? 'line ' + line + '<br>' : '') +
+                 '<br><small>' + navigator.userAgent + '</small>';
+};
+setTimeout(function () {
+  var el = document.getElementById('boot');
+  if (!el) return;                       /* 정상 진행되면 boot 는 이미 사라졌다 */
+  var z = document.getElementById('tsz:device/XN.json');
+  var d = document.getElementById('ts:devices.json');
+  el.className = 'boot err';
+  el.innerHTML = '데이터를 읽지 못했습니다.<br><br>' +
+    '<small style="text-align:left;display:inline-block">' +
+    '데이터 블록: ' + (d ? '있음(' + d.textContent.length + ')' : '없음') + '<br>' +
+    '압축 블록: ' + (z ? '있음(' + z.textContent.length + ')' : '없음') + '<br>' +
+    '압축 해제 지원: ' + (typeof DecompressionStream !== 'undefined' ? '예' : '아니오') + '<br>' +
+    'fetch: ' + (typeof fetch !== 'undefined' ? '예' : '아니오') + '<br>' +
+    'Promise: ' + (typeof Promise !== 'undefined' ? '예' : '아니오') + '<br><br>' +
+    navigator.userAgent + '</small>';
+}, 6000);
+</script>
+
+<script src="js/app.js"></script>
+</body>
+</html>
