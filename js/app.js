@@ -545,15 +545,10 @@ function specialHTML(e) {
   return '<details class="acc spec"><summary>스페셜 케이스 ' + sp.length +
     '건' + (lf >= 1.5 ? ' <span class="tag sp">' + lf + '배</span>' : '') +
     '<span class="src">현장</span></summary><div class="body">' + lift + dist +
-    '<div class="note"><b>반복</b> = 같은 <b>장비(Serial)</b>에서 같은 Error 로 ' +
-    '<b>90일 안에 4회 이상</b> 다시 방문한 건. 시도한 순서 자체가 단서가 됩니다. ' +
-    '<b>마지막 방문의 조치가 정답이라는 뜻은 아닙니다</b> — 그 뒤로 같은 Error 기록이 ' +
-    '없다는 뜻입니다.<br><b>장시간</b> = 한 방문에 <b>8시간 이상</b> 걸린 건 ' +
-    '(고장 수리 · 그 방문에 Error 가 하나뿐인 것만). 소요시간은 시작~종료 시각이라 ' +
-    '대략의 크기이고, <b>야간</b>은 자정을 넘긴 출동이라 그 시간 내내 붙어 있었다는 ' +
-    '뜻은 아닙니다.<br>흔한 Error 는 그냥 확률적으로 많이 뽑히므로 <b>발생 건수로 ' +
-    '나눈 비율</b>이 평균의 3배 이상인 Error 만 싣습니다 (반복 6회·16시간 이상인 건은 ' +
-    '예외로 남깁니다).</div>' + b + '</div></details>';
+    '<div class="note"><b>반복</b> = 같은 장비에서 90일 안에 4회 이상 다시 방문. ' +
+    '<b>장시간</b> = 한 방문 8시간 이상. ' +
+    '<b>마지막 조치가 정답이라는 뜻은 아닙니다</b> — 그 뒤로 기록이 없다는 뜻입니다.</div>' +
+    b + '</div></details>';
 }
 
 function partsHTML(e) {
