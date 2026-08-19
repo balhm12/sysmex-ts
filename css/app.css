@@ -1,12 +1,17 @@
 /* Sysmex TS Guide — 모바일 우선. 현장에서 한 손으로 쓰는 것을 기준으로 잡았다. */
 :root{
-  --ink:#16191d; --mid:#646c75; --dim:#8b949e;
-  --line:#e4e8ed; --bg:#f5f6f8; --card:#fff;
+  --ink:#14171c; --mid:#5c646e; --dim:#8b949e;
+  --line:#e3e7ec; --bg:#f4f6f8; --card:#fff;
   --pri:#1d4e89;            /* Sysmex 블루 — S/M(공식) 계열 */
-  --crm:#1f7a4d;            /* 현장 CRM 계열 */
+  --pri-d:#17406f;
+  --crm:#1a7048;            /* 현장 CRM 계열 */
   --warn:#a4562a; --hot:#c0392b;
   --tap:44px;               /* 최소 터치 크기 */
   --hd:112px;               /* 헤더 높이 (JS 가 실측해 덮어쓴다) */
+  /* 현장은 밝은 곳에서 한 손으로 본다 — 면을 띄워 경계를 분명히 한다 */
+  --r:14px;
+  --sh:0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.05);
+  --sh-2:0 2px 6px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.05);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
@@ -27,11 +32,21 @@ button,input{font:inherit}
 
 /* ── 헤더 ───────────────────────────────────────────── */
 header{
-  position:sticky;top:0;z-index:40;background:var(--pri);color:#fff;
-  padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;
+  position:sticky;top:0;z-index:40;color:#fff;
+  background:linear-gradient(180deg,var(--pri) 0%,var(--pri-d) 100%);
+  padding:calc(env(safe-area-inset-top) + 10px) 12px 11px;
+  box-shadow:0 1px 0 rgba(0,0,0,.06), 0 2px 8px rgba(16,24,40,.10);
 }
 header .made{font-size:10.5px;letter-spacing:.06em;color:rgba(255,255,255,.72);
   font-weight:600;margin:0 0 5px}
+/* 이름은 한글, 원래 이름은 작게 병기 */
+#title .en{font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  color:rgba(255,255,255,.72);margin-left:5px;white-space:nowrap}
+header.compact #title .en{display:none}
+/* 문구 — 홈과 잠금 화면에 */
+.tagline{margin:0 0 14px;font-size:14px;color:var(--mid);letter-spacing:-.2px}
+.tagline b{color:var(--pri);font-weight:800}
+.tagline.home{margin:2px 0 16px}
 header .bar{display:flex;align-items:center;gap:8px;min-height:30px}
 header .bar .brand{flex:1;min-width:0}
 /* 홈 버튼 — 아이콘만으로는 안 보인다는 지적. 글씨를 같이 넣고 테두리를 준다 */
@@ -79,39 +94,48 @@ main{padding:12px 12px 40px;max-width:820px;margin:0 auto}
 .obtn{display:block;width:100%;min-height:44px;margin:10px 0 0;border:1px solid var(--pri);
   background:#fff;color:var(--pri);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
 .obtn:disabled{opacity:.6;cursor:default}
-.sec{margin:0 0 18px}
+.sec{margin:0 0 22px}
 .sec>h2{
-  margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.04em;
+  display:flex;align-items:center;gap:6px;
+  margin:0 0 9px;font-size:12px;font-weight:800;letter-spacing:.05em;
   color:var(--mid);text-transform:uppercase;
 }
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
-.muted{color:var(--mid);font-size:12.5px;margin:6px 0 0}
-.empty{padding:26px 12px;text-align:center;color:var(--mid);font-size:13.5px}
+.sec>h2::before{content:'';width:3px;height:12px;border-radius:2px;background:var(--pri)}
+.pmsec>h2::before{background:#c2762d}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh)}
+.muted{color:var(--mid);font-size:12.5px;margin:7px 0 0;line-height:1.55}
+.empty{padding:28px 12px;text-align:center;color:var(--mid);font-size:13.5px}
 
 /* ── 장비 칩 ────────────────────────────────────────── */
-.devs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.devs{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .dev{
-  min-height:56px;display:flex;flex-direction:column;justify-content:center;
-  background:var(--card);border:1px solid var(--line);border-radius:11px;
-  padding:8px 6px;cursor:pointer;text-align:center;color:var(--ink);
+  min-height:62px;display:flex;flex-direction:column;justify-content:center;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:9px 6px;cursor:pointer;text-align:center;color:var(--ink);
+  box-shadow:var(--sh);transition:transform .06s ease
 }
-.dev b{font-size:15px}
-.dev i{font-style:normal;font-size:11px;color:var(--dim);margin-top:2px}
-.dev.on{border-color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri)}
+.dev b{font-size:15.5px;letter-spacing:-.2px}
+.dev i{font-style:normal;font-size:11px;color:var(--dim);margin-top:3px}
+.dev:active{transform:scale(.97)}
+.dev.on{border-color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri),var(--sh)}
 
 /* ── 목록 행 (검색 결과 · 에러 목록) ────────────────────── */
 .rows{overflow:hidden}
 .row{
   display:block;width:100%;text-align:left;background:none;border:0;
-  border-bottom:1px solid #f0f2f5;padding:11px 12px;cursor:pointer;
-  min-height:var(--tap);color:inherit;
+  border-bottom:1px solid #eef1f4;padding:12px 30px 12px 13px;cursor:pointer;
+  min-height:var(--tap);color:inherit;position:relative;
 }
+/* 누를 수 있는 줄임을 보이게 — 현장에서 목록과 본문이 헷갈리지 않도록 */
+.row::after{content:'›';position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  color:var(--dim);font-size:19px;line-height:1}
 .rows .row:last-child{border-bottom:0}
 .row:active{background:#eef2f7}
-.r1{display:flex;align-items:baseline;gap:7px}
-.r1 .t{flex:1;min-width:0;font-weight:600;font-size:14.5px;
+.r1{display:flex;align-items:baseline;gap:8px}
+.r1 .t{flex:1;min-width:0;font-weight:700;font-size:15px;letter-spacing:-.2px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.r1 .n{flex:none;font-size:12px;color:var(--mid)}
+.r1 .n{flex:none;font-size:12px;color:var(--mid);font-variant-numeric:tabular-nums}
 .r2{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
 .tag{font-size:11px;border-radius:5px;padding:1px 6px;white-space:nowrap}
 .tag.dv{background:#eef2f9;color:var(--pri);font-weight:700}
@@ -126,11 +150,15 @@ main{padding:12px 12px 40px;max-width:820px;margin:0 auto}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── 상세 ──────────────────────────────────────────── */
-.head{padding:14px 14px 12px}
-.head h1{margin:0;font-size:19px;line-height:1.35;letter-spacing:-.2px}
-.head .ko{margin:3px 0 0;font-size:13px;color:var(--mid)}
-.stats{display:flex;gap:16px;margin:11px 0 0;flex-wrap:wrap}
-.stat b{display:block;font-size:17px}
+.head{padding:15px 15px 13px;box-shadow:var(--sh-2)}
+.head h1{margin:0;font-size:20px;line-height:1.32;letter-spacing:-.35px;font-weight:800}
+.head .ko{margin:4px 0 0;font-size:13px;color:var(--mid)}
+/* 수치는 한 덩어리로 묶어 제목과 구분한다 */
+.stats{display:flex;gap:0;margin:12px 0 0;flex-wrap:wrap;
+  border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fafbfc}
+.stat{flex:1;min-width:74px;padding:8px 10px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font-size:17px;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
 .stat span{font-size:11px;color:var(--mid)}
 
 .share{margin:12px 0 0}
@@ -143,18 +171,21 @@ main{padding:12px 12px 40px;max-width:820px;margin:0 auto}
 
 .cta{
   display:block;width:100%;min-height:50px;margin:14px 0 0;
-  background:var(--pri);color:#fff;border:0;border-radius:11px;
-  font-size:16px;font-weight:700;cursor:pointer;
+  background:var(--pri);color:#fff;border:0;border-radius:12px;
+  font-size:16px;font-weight:800;cursor:pointer;letter-spacing:-.2px;
+  box-shadow:0 1px 2px rgba(16,24,40,.12);
 }
-.cta:active{opacity:.88}
+.cta:active{opacity:.9;transform:translateY(1px)}
 
 /* 근거 구분 — 색과 배지로 S/M(공식)과 CRM(현장)을 절대 섞지 않는다 */
 details.acc{background:var(--card);border:1px solid var(--line);
-  border-radius:12px;margin:10px 0 0;overflow:hidden}
+  border-radius:var(--r);margin:10px 0 0;overflow:hidden;box-shadow:var(--sh)}
 details.acc>summary{
-  list-style:none;cursor:pointer;padding:13px 14px;min-height:var(--tap);
-  display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;
+  list-style:none;cursor:pointer;padding:14px;min-height:var(--tap);
+  display:flex;align-items:center;gap:8px;font-weight:800;font-size:14.5px;
+  letter-spacing:-.1px;
 }
+details.acc[open]>summary{border-bottom:1px solid #f0f2f5}
 details.acc>summary::-webkit-details-marker{display:none}
 details.acc>summary::after{content:'▾';margin-left:auto;color:var(--dim);font-size:12px}
 details.acc[open]>summary::after{content:'▴'}
@@ -198,8 +229,10 @@ details.acc>summary .src{
   display:flex;align-items:center;justify-content:center}
 .sv.last>.sh .no{background:var(--crm)}
 .sv ul{margin:0;padding-left:16px;font-size:13.5px}
-.body{padding:0 14px 14px;font-size:14px}
-.body h4{margin:12px 0 5px;font-size:12px;color:var(--mid);letter-spacing:.03em}
+.body{padding:12px 14px 14px;font-size:14px}
+.body h4{margin:14px 0 6px;font-size:11.5px;color:var(--mid);letter-spacing:.05em;
+  font-weight:800;text-transform:uppercase}
+.body>h4:first-child{margin-top:0}
 .body ul{margin:0;padding-left:17px}
 .body li{margin:3px 0}
 .body p{margin:6px 0}
@@ -207,21 +240,28 @@ details.acc>summary .src{
   padding:8px 10px;margin:10px 0 0}
 
 /* 체크리스트 (Phase 1 — 분기 없음) */
-.stage{border:1px solid var(--line);border-radius:11px;margin:10px 0 0;overflow:hidden}
-.stage>.sh{display:flex;align-items:center;gap:8px;padding:10px 12px;
-  background:#fafbfc;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.stage{border:1px solid var(--line);border-radius:12px;margin:10px 0 0;overflow:hidden}
+.stage>.sh{display:flex;align-items:center;gap:8px;padding:11px 12px;
+  background:#fafbfc;border-bottom:1px solid var(--line);font-size:13px;font-weight:800;
+  letter-spacing:-.1px}
 .stage .no{flex:none;width:22px;height:22px;border-radius:50%;background:var(--pri);
-  color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
+  color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
 .stage.sm0 .no{background:var(--pri)} .stage.s1 .no{background:var(--crm)}
 .stage.s2 .no{background:#7a6aa8}
-.chk{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;
+/* 단계별로 왼쪽 색띠 — 1차/2차를 색으로도 구분해 훑기 쉽게 */
+.stage.sm0{border-left:3px solid var(--pri)}
+.stage.s1{border-left:3px solid var(--crm)}
+.stage.s2{border-left:3px solid #7a6aa8}
+.chk{display:flex;gap:11px;align-items:flex-start;padding:11px 12px;
   border-bottom:1px solid #f3f5f7;cursor:pointer;min-height:var(--tap)}
 .stage .chk:last-child{border-bottom:0}
 .dim{font-size:.86em;color:var(--mid)}
 .dim b{color:inherit}
 .chk input{flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:var(--crm)}
-.chk span{flex:1;font-size:14px}
+.chk span{flex:1;font-size:14.5px;line-height:1.5}
 .chk.done span{color:var(--dim);text-decoration:line-through}
+.chk.done{background:#fafbfc}
 
 /* 부품표 */
 .pt{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -315,7 +355,22 @@ blockquote em{display:block;font-style:normal;font-size:11.5px;
 .pmi .pmh .no{flex:none;width:21px;height:21px;border-radius:50%;background:#c2762d;
   color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;
   justify-content:center}
+/* 표준 체크리스트 원문 항목 — 손대지 않은 문구임을 보이게 */
+.pmi .std{margin:0 0 7px;padding-left:17px;font-size:13.5px}
+.pmi .std li{margin:2px 0}
+.pmi .parts{background:#f7f8fa;border-radius:9px;padding:8px 10px;margin:0 0 8px}
+.pmi .parts h5{margin:0 0 4px;font-size:11px;color:var(--mid);letter-spacing:.03em}
+.pmi .pp{font-size:12.5px;margin:2px 0;display:flex;flex-wrap:wrap;gap:5px;
+  align-items:baseline}
+.pmi .pp i{font-style:normal;color:var(--mid);font-size:11.5px}
 .pmi .how{margin:0 0 4px;font-size:13.5px}
+/* TEST 표시 */
+.tst{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;
+  background:#8a5216;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:2px}
+.testbar{background:#fbf0e2;border:1px solid #e8d3b3;color:#6b4413;border-radius:11px;
+  padding:10px 12px;margin:0 0 10px;font-size:12.5px}
+.testbar b{background:#8a5216;color:#fff;border-radius:4px;padding:1px 5px;
+  font-size:10px;letter-spacing:.06em;margin-right:5px}
 .pmi .dim{margin:0 0 8px}
 .pmi .acts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
 .act{display:flex;align-items:center;gap:5px;border:1px solid var(--line);
@@ -336,13 +391,20 @@ blockquote em{display:block;font-style:normal;font-size:11.5px;
      아래 display:block 이 !important 에 져서 빈 페이지가 나온다 */
   body.printing>*:not(#pmprint){display:none !important}
   body.printing #pmprint{display:block !important;padding:0}
-  #pmprint h1{font-size:15pt;margin:0 0 8pt}
-  #pmprint table{width:100%;border-collapse:collapse;font-size:8.5pt}
-  #pmprint .hd td{border:1px solid #999;padding:3pt 5pt}
-  #pmprint .hd td:nth-child(odd){background:#eee;width:15%;font-weight:700}
+  #pmprint h1{font-size:13pt;margin:0 0 3pt}
+  #pmprint .tst{background:#8a5216;color:#fff;font-size:8pt;padding:1pt 4pt;
+    border-radius:2pt;vertical-align:2pt}
+  #pmprint .sub{margin:0 0 8pt;font-size:8pt;color:#555}
+  #pmprint table{width:100%;border-collapse:collapse;font-size:8.5pt;
+    table-layout:fixed}
+  #pmprint .hd{margin-bottom:8pt}
+  #pmprint .hd td{border:1px solid #999;padding:3pt 5pt;word-wrap:break-word}
+  #pmprint .hd td:nth-child(odd){background:#eee;width:16%;font-weight:700}
   #pmprint .bd th,#pmprint .bd td{border:1px solid #999;padding:4pt 5pt;
-    vertical-align:top;text-align:left}
-  #pmprint .bd th{background:#e8ecf2}
+    vertical-align:top;text-align:left;word-wrap:break-word}
+  #pmprint .bd th{background:#e8ecf2;text-align:center}
+  #pmprint .bd td.g{background:#f4f6f9;font-weight:700}
+  #pmprint .bd td.c{text-align:center}
   #pmprint .bd tr{break-inside:avoid}
   #pmprint .s{color:#555;font-size:7.5pt;margin-top:2pt}
   #pmprint .ft{margin-top:8pt;font-size:7.5pt;color:#555}

@@ -1,4 +1,4 @@
-/* Sysmex TS Guide — Mobile (Phase 1)
+/* 실마리 (Sysmex TS Guide) — Mobile (Phase 1)
  *
  * 원칙
  *  · 데이터는 build_mobile.py 가 만든 JSON 만 읽는다. UI 는 통계를 만들지 않는다.
@@ -239,7 +239,7 @@ function listHTML(rows, emptyMsg) {
 
 /* ── 화면 1: Home ─────────────────────────────────── */
 function renderHome() {
-  titleEl.textContent = 'Sysmex TS Guide';
+  titleEl.innerHTML = '실마리 <span class="en">Sysmex TS Guide</span>';
   subEl.textContent = META.devices.length + '개 장비 · 데이터 ' + META.v;
   backEl.hidden = true;
   homeEl.hidden = true;
@@ -264,13 +264,15 @@ function renderHome() {
   // PM(정기 점검)은 수리(TS)와 다른 업무다 — 구역을 나눠 섞이지 않게 둔다
   var pmCard = META.pm
     ? '<div class="sec pmsec"><h2>정기 점검 (PM)</h2>' +
-      '<button class="pmgo" data-go-pm="1"><b>PM 후 확인 체크리스트</b>' +
+      '<button class="pmgo" data-go-pm="1">' +
+      '<b>PM 후 확인 체크리스트 <span class="tst">TEST</span></b>' +
       '<i>PM 직후에 실제로 터지는 곳만 · 체크 후 PDF·엑셀 출력</i></button>' +
       '<p class="muted">수리(TS)와는 별개 업무입니다. 위쪽은 고장 수리용, ' +
       '여기는 정기 점검용입니다.</p></div>'
     : '';
 
   view.innerHTML =
+    '<p class="tagline home">막혔을 때, 해결의 <b>실마리</b>를 찾다</p>' +
     '<div class="sec"><h2>수리 (TS) — 장비를 고르십시오</h2>' +
     '<div class="devs">' + devs + '</div></div>' +
     recHTML +
@@ -295,7 +297,7 @@ function pmSave(s) {
 
 function renderPM() {
   titleEl.textContent = 'PM 후 확인';
-  subEl.textContent = '정기 점검 · 수리(TS)와 별개';
+  subEl.textContent = 'TEST · 정기 점검 (수리와 별개)';
   backEl.hidden = false; homeEl.hidden = false;
   view.innerHTML = '<div class="card"><div class="empty">불러오는 중…</div></div>';
 
@@ -318,13 +320,23 @@ function renderPM() {
         return '<label class="act' + on + '"><input type="checkbox" data-pm="' + id +
           '"' + (s[id] ? ' checked' : '') + '><span>' + esc(a) + '</span></label>';
       }).join('');
+      // 표준 체크리스트 항목명은 원문 그대로 (묶음 → 항목)
+      var std = (it.rows || []).map(function (x) {
+        return '<li>' + esc(x) + '</li>';
+      }).join('');
+      var parts = (it.parts || []).map(function (pp) {
+        return '<div class="pp"><span class="pn">' + esc(pp.pn) + '</span>' +
+          esc(pp.name) + '<i>' + esc(pp.when) + '</i></div>';
+      }).join('');
       return '<div class="pmi"><div class="pmh"><span class="no">' + (i + 1) + '</span>' +
-        '<b>' + esc(it.item) + '</b>' +
+        '<b>' + esc(it.group) + '</b>' +
         '<span class="tag sp">' + it.x + '배</span></div>' +
+        (std ? '<ul class="std">' + std + '</ul>' : '') +
+        (parts ? '<div class="parts"><h5>교체 부품</h5>' + parts + '</div>' : '') +
         '<p class="how">' + esc(it.how) + '</p>' +
         '<p class="dim">PM 직후에 나는 Error — ' + esc(it.err) + '</p>' +
         '<div class="acts">' + acts + '</div>' +
-        '<input class="memo" data-pm="m' + i + '" placeholder="비고 (측정값·특이사항)" value="' +
+        '<input class="memo" data-pm="m' + i + '" placeholder="측정값 · 특이사항" value="' +
         esc(s['m' + i] || '') + '"></div>';
     }).join('');
 
@@ -334,10 +346,16 @@ function renderPM() {
     }).join('');
 
     var late = (j.late || []).map(function (x) {
-      return '<li>' + esc(x.err) + ' <span class="dim">— ' + esc(x.item) + '</span></li>';
+      var pp = (x.parts || []).map(function (q) {
+        return '<span class="pn">' + esc(q.pn) + '</span>';
+      }).join(' ');
+      return '<li>' + esc(x.err) + '<div class="dim">' + esc(x.item) +
+        (pp ? ' ' + pp : '') + '</div></li>';
     }).join('');
 
     view.innerHTML =
+      (j.test ? '<div class="testbar"><b>TEST</b> 시험 중인 기능입니다. ' +
+       '표준 PM 절차를 대체하지 않습니다 — 확인용으로만 쓰십시오.</div>' : '') +
       '<div class="card"><div class="pmhd">' + hin + '</div></div>' +
       '<div class="sec"><h2>PM 에서 손댄 곳 — 마치기 전에 확인</h2>' + rows + '</div>' +
       '<div class="card pmact">' +
@@ -393,17 +411,32 @@ function pmHead() {
 }
 
 function pmCsv() {
-  var h = pmHead(), r = pmRows();
+  var h = pmHead(), s = pmState();
   var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
   var lines = [
-    ['XN-10/11/20/21 PM 후 확인 체크리스트'].map(q).join(','),
+    ['XN-10/XN-11/XN-20/XN-21 PM 후 확인 체크리스트 (TEST)'].map(q).join(','),
+    [PM.src || ''].map(q).join(','),
     ['Model', h.model, 'Serial No.', h.serial].map(q).join(','),
-    ['기관', h.fac, 'PM 일자', h.date].map(q).join(','),
-    ['담당 엔지니어', h.eng].map(q).join(','), '',
-    ['#', 'PM 항목', '확인할 것', '수행한 작업', '비고', 'PM 직후 Error', '직후/평소'].map(q).join(','),
+    ['Facility name', h.fac, 'PM completed on', h.date].map(q).join(','),
+    ['Person in charge', h.eng].map(q).join(','), '',
+    ['Check item', '항목 (원문)', 'Yes', 'No', '수행한 작업',
+     '교체 부품 (P/N)', 'Value / 비고', 'PM 직후 Error', '직후/평소'].map(q).join(','),
   ];
-  r.forEach(function (x) {
-    lines.push([x.no, x.item, x.how, x.done, x.memo, x.err, x.x + '배'].map(q).join(','));
+  PM.items.forEach(function (it, i) {
+    var acts = it.acts.filter(function (a) { return s['pm' + i + '_' + a]; });
+    var parts = (it.parts || []).map(function (p) {
+      return p.pn + ' ' + p.name + ' (' + p.when + ')';
+    }).join(' / ');
+    (it.rows.length ? it.rows : ['']).forEach(function (rw, k) {
+      lines.push([k === 0 ? it.group : '', rw,
+                  k === 0 ? (acts.length ? 'Y' : '') : '',
+                  k === 0 ? (acts.length ? '' : 'Y') : '',
+                  k === 0 ? acts.join(' · ') : '',
+                  k === 0 ? parts : '',
+                  k === 0 ? (s['m' + i] || '') : '',
+                  k === 0 ? it.err : '',
+                  k === 0 ? it.x + '배' : ''].map(q).join(','));
+    });
   });
   lines.push('', [PM.basis].map(q).join(','));
   // 엑셀이 한글을 깨지 않게 BOM 을 붙인다
@@ -431,25 +464,52 @@ function pmSaveAs(blob, name) {
   setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 1000);
 }
 
+/* 인쇄 양식은 Sysmex 표준 체크리스트를 따른다 —
+   Check item(묶음 / 항목) · Yes · No · Check/Adjustment item · Value 칸 구조. */
 function pmPdf() {
-  var h = pmHead(), r = pmRows();
-  var rows = r.map(function (x) {
-    return '<tr><td>' + x.no + '</td><td>' + esc(x.item) + '<div class="s">' +
-      esc(x.how) + '</div></td><td>' + esc(x.done || '—') + '</td><td>' +
-      esc(x.memo) + '</td><td>' + esc(x.err) + '<div class="s">' + x.x + '배</div></td></tr>';
+  var h = pmHead(), s = pmState();
+  var body = PM.items.map(function (it, i) {
+    var rows = it.rows.length ? it.rows : [''];
+    var acts = it.acts.filter(function (a) { return s['pm' + i + '_' + a]; });
+    var yes = acts.length ? '☑' : '☐';
+    var no = acts.length ? '☐' : '☑';
+    var parts = (it.parts || []).map(function (p) {
+      return p.pn + ' ' + p.name + ' (' + p.when + ')';
+    }).join('<br>');
+    return rows.map(function (rw, k) {
+      var first = k === 0;
+      return '<tr>' +
+        (first ? '<td rowspan="' + rows.length + '" class="g">' + esc(it.group) + '</td>' : '') +
+        '<td>' + esc(rw) + '</td>' +
+        (first ? '<td rowspan="' + rows.length + '" class="c">' + yes + '</td>' +
+                 '<td rowspan="' + rows.length + '" class="c">' + no + '</td>' +
+                 '<td rowspan="' + rows.length + '">' + esc(acts.join(' · ') || '—') +
+                 (parts ? '<div class="s">' + parts + '</div>' : '') + '</td>' +
+                 '<td rowspan="' + rows.length + '">' + esc(s['m' + i] || '') + '</td>' +
+                 '<td rowspan="' + rows.length + '" class="c">' + esc(it.err) +
+                 '<div class="s">' + it.x + '배</div></td>' : '') +
+        '</tr>';
+    }).join('');
   }).join('');
   var w = document.createElement('div');
   w.id = 'pmprint';
   w.innerHTML =
-    '<h1>XN-10/11/20/21 PM 후 확인 체크리스트</h1>' +
+    '<h1>XN-10/XN-11/XN-20/XN-21 PM 후 확인 체크리스트 <span class="tst">TEST</span></h1>' +
+    '<p class="sub">' + esc(PM.src || '') + ' 를 보완하는 확인표입니다.</p>' +
     '<table class="hd"><tr><td>Model</td><td>' + esc(h.model) + '</td>' +
     '<td>Serial No.</td><td>' + esc(h.serial) + '</td></tr>' +
-    '<tr><td>기관</td><td>' + esc(h.fac) + '</td><td>PM 일자</td><td>' + esc(h.date) + '</td></tr>' +
-    '<tr><td>담당</td><td colspan="3">' + esc(h.eng) + '</td></tr></table>' +
-    '<table class="bd"><thead><tr><th>#</th><th>PM 항목 · 확인할 것</th>' +
-    '<th>수행</th><th>비고</th><th>PM 직후 Error</th></tr></thead><tbody>' +
-    rows + '</tbody></table>' +
-    '<p class="ft">' + esc(PM.basis) + ' · ' + esc(PM.period) + '</p>';
+    '<tr><td>Facility name</td><td>' + esc(h.fac) + '</td>' +
+    '<td>PM completed on</td><td>' + esc(h.date) + '</td></tr>' +
+    '<tr><td>Person in charge</td><td colspan="3">' + esc(h.eng) + '</td></tr></table>' +
+    '<table class="bd"><thead><tr>' +
+    '<th style="width:14%">Check item</th><th style="width:26%"></th>' +
+    '<th style="width:4%">Yes</th><th style="width:4%">No</th>' +
+    '<th style="width:22%">수행한 작업 · 교체 부품</th>' +
+    '<th style="width:16%">Value / 비고</th>' +
+    '<th style="width:14%">PM 직후 Error</th></tr></thead><tbody>' +
+    body + '</tbody></table>' +
+    '<p class="ft">' + esc(PM.basis) + ' · ' + esc(PM.period) +
+    ' · 항목명은 표준 체크리스트 원문입니다.</p>';
   document.body.appendChild(w);
   document.body.classList.add('printing');
   var done = function () {
@@ -1085,13 +1145,14 @@ window.addEventListener('hashchange', route);
 /* ── 잠금 화면 ─────────────────────────────────────── */
 function askPassword(msg) {
   boot.remove();
-  titleEl.textContent = 'Sysmex TS Guide';
+  titleEl.innerHTML = '실마리 <span class="en">Sysmex TS Guide</span>';
   subEl.textContent = '';
   backEl.hidden = true;
   homeEl.hidden = true;
   document.body.classList.add('locked');
   view.innerHTML =
     '<div class="card lock">' +
+    '<p class="tagline">막혔을 때, 해결의 <b>실마리</b>를 찾다</p>' +
     '<h2>비밀번호</h2>' +
     '<p class="muted">현장 배포용 비밀번호를 넣어 주십시오. 이 기기에서 한 번만 하면 됩니다.</p>' +
     (msg ? '<div class="lockerr">' + esc(msg) + '</div>' : '') +

@@ -1,7 +1,7 @@
 {
-  "name": "Sysmex TS Guide",
-  "short_name": "TS Guide",
-  "description": "Sysmex 장비 Troubleshooting Guide — 오프라인 사용",
+  "name": "실마리 · Sysmex TS Guide",
+  "short_name": "실마리",
+  "description": "막혔을 때, 해결의 실마리를 찾다 — Sysmex 장비 Troubleshooting Guide · 오프라인 사용",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
