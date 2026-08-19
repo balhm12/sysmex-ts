@@ -2,9 +2,9 @@
  "v": 1,
  "kdf": "PBKDF2-SHA256",
  "iter": 600000,
- "salt": "irsc9c8K/bbjszdtiYnW0A==",
+ "salt": "+f/1/BlqA6izih7tiU4Vvw==",
  "cipher": "AES-256-GCM",
  "gz": true,
- "verify": "z0/NfJ/ZjGInV5UbExFanDsojyUbmiBjNNCgWG7+u5pNcyXO5gNg39DjeQ==",
+ "verify": "+AySQBFKYnZY36BO8vWFfjf6zI8EbSiu+wraqvwIq7ZAjTZu+QjwuKurZQ==",
  "note": "데이터는 비밀번호로 잠겨 있습니다. 이 파일에는 비밀번호가 들어 있지 않습니다."
 }
