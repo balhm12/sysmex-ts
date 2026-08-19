@@ -526,9 +526,25 @@ function specialHTML(e) {
   var lift = lf >= 1.5
     ? '<p><b>이 Error 는 평균보다 ' + lf + '배 자주 애먹었습니다.</b> ' +
       '<span class="dim">(같은 기준으로 센 전 장비 평균 대비)</span></p>' : '';
+  // 같은 Error 라도 대부분은 한 번에 끝난다 — 겁먹지 않도록 대비를 먼저 보여 준다
+  var d = sp[0] && sp[0].dist, dist = '';
+  if (d && d.units >= 5) {
+    var seg = [['one', d.one, '1회로 끝남', 'g1'],
+               ['few', d.few, '2~3회', 'g2'],
+               ['many', d.many, '4회 이상', 'g3']];
+    dist = '<h4>이 Error 를 겪은 장비 ' + d.units + '대 — 몇 번 만에 끝났나</h4>' +
+      '<div class="rbar">' + seg.map(function (s) {
+        return s[1] ? '<i class="' + s[3] + '" style="flex:' + s[1] + '">' + s[1] + '</i>' : '';
+      }).join('') + '</div><div class="rlg">' + seg.map(function (s) {
+        return '<span><i class="' + s[3] + '"></i>' + s[2] + ' ' + s[1] + '대</span>';
+      }).join('') + '</div>' +
+      '<p class="dim" style="margin:4px 0 0">' +
+      (d.one + d.few) + '대는 3회 안에 끝났습니다. 아래는 <b>' + d.many +
+      '대에서 애먹은 기록</b>입니다 — 같은 Error 라도 늘 어려운 것은 아닙니다.</p>';
+  }
   return '<details class="acc spec"><summary>스페셜 케이스 ' + sp.length +
     '건' + (lf >= 1.5 ? ' <span class="tag sp">' + lf + '배</span>' : '') +
-    '<span class="src">현장</span></summary><div class="body">' + lift +
+    '<span class="src">현장</span></summary><div class="body">' + lift + dist +
     '<div class="note"><b>반복</b> = 같은 <b>장비(Serial)</b>에서 같은 Error 로 ' +
     '<b>90일 안에 4회 이상</b> 다시 방문한 건. 시도한 순서 자체가 단서가 됩니다. ' +
     '<b>마지막 방문의 조치가 정답이라는 뜻은 아닙니다</b> — 그 뒤로 같은 Error 기록이 ' +
