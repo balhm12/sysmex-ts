@@ -20,7 +20,8 @@ var RECENT_KEY = 'sysmex-ts-recent';
 
 var $ = function (s, r) { return (r || document).querySelector(s); };
 var SW = null;                // Service Worker 등록 결과
-var view = $('#view'), qEl = $('#q'), qx = $('#qx'), backEl = $('#back');
+var view = $('#view'), qEl = $('#q'), qx = $('#qx'), backEl = $('#back'),
+    homeEl = $('#home');
 var titleEl = $('#title'), subEl = $('#sub'), boot = $('#boot');
 
 /* ── 유틸 ─────────────────────────────────────────── */
@@ -221,6 +222,8 @@ function rowHTML(r) {
     tags += '<span class="tag rc' + (r.r >= 55 ? ' hi' : '') + '">재발 ' + r.r + '%</span>';
   }
   if (r.p === 2) tags += '<span class="tag p2">전체</span>';
+  // 한 번에 안 잡힌 건이 있는 Error — 목록에서 바로 알아보게
+  if (r.sp) tags += '<span class="tag sp">스페셜 ' + r.sp + '</span>';
   return '<button class="row" data-go="' + r.d + '/' + r.p + '/' + r.i + '">' +
     '<span class="r1"><span class="t">' + esc(r.t) + '</span>' +
     '<span class="n">' + num(r.n) + '건</span></span>' +
@@ -239,6 +242,7 @@ function renderHome() {
   titleEl.textContent = 'Sysmex TS Guide';
   subEl.textContent = META.devices.length + '개 장비 · 데이터 ' + META.v;
   backEl.hidden = true;
+  homeEl.hidden = true;
 
   var devs = META.devices.map(function (d) {
     return '<button class="dev" data-dev="' + d.id + '"><b>' + esc(d.name) + '</b>' +
@@ -342,6 +346,7 @@ function renderDevice(id, tab) {
   titleEl.textContent = d.name;
   subEl.textContent = d.label;
   backEl.hidden = false;
+  homeEl.hidden = false;
   view.innerHTML = '<div class="card"><div class="empty">불러오는 중…</div></div>';
 
   loadDevice(id).then(function (j) {
@@ -349,7 +354,8 @@ function renderDevice(id, tab) {
     tab = tab === '2' ? '2' : '1';
     var items = j.list[tab === '2' ? 'p2' : 'p1'];
     var rows = items.map(function (x) {
-      return { d: id, p: Number(tab), i: x.i, t: x.en, c: x.c, n: x.n, r: x.r, cz: x.cz };
+      return { d: id, p: Number(tab), i: x.i, t: x.en, c: x.c, n: x.n, r: x.r,
+               cz: x.cz, sp: x.sp };
     });
     view.innerHTML =
       '<div class="tabs">' +
@@ -383,8 +389,12 @@ function stagesHTML(steps) {
     var no = s.kind === 0 ? '·' : String(s.kind);
     var items = (s.items || []).map(function (it, ii) {
       var id = 'c' + si + '_' + ii;
+      // 조치 자체가 눈에 들어오게 — "—" 뒤의 건수·사례 설명은 작고 연하게
+      var t = rich(it);
+      var cut = t.indexOf(' — ');
+      if (cut > 0) t = t.slice(0, cut) + ' <span class="dim">— ' + t.slice(cut + 3) + '</span>';
       return '<label class="chk" for="' + id + '">' +
-        '<input type="checkbox" id="' + id + '"><span>' + rich(it) + '</span></label>';
+        '<input type="checkbox" id="' + id + '"><span>' + t + '</span></label>';
     }).join('');
     return '<div class="stage ' + cls + '"><div class="sh"><span class="no">' + no +
       '</span>' + esc(s.label) + '</div>' + items + '</div>';
@@ -435,22 +445,113 @@ function crmHTML(e) {
   b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps);
   if (e.verify) b += '<h4>조치 후 확인</h4><p>' + rich(e.verify) + '</p>';
   if (e.caution) b += '<h4>주의사항</h4><p>' + rich(e.caution) + '</p>';
-  b += '<div class="note">항목은 현장 빈도로 뽑고, 표시 순서는 <b>작업 순서</b>' +
-       '(분해점검→세정→윤활→조정→재조립→<b>교체 마지막</b>)로 정렬했습니다. ' +
-       '빈도 분포는 위 그래프에 있습니다. S/M 이 규정한 표준 절차가 아닙니다.</div>';
   return '<details class="acc crm" open><summary>CRM Actual<span class="src">현장</span>' +
     '</summary><div class="body">' + b + '</div></details>';
 }
 
+/* XN Data 불량 — 측정 항목 × 증상(높음/낮음/재현성) 분해.
+   WBC 계열(WNR·WDF·RET·WPC 등)은 FCM 계통, RBC·HCT·PLT 는 RBC 계통 (현장 기준). */
+function itemsHTML(e) {
+  var di = e.data_items;
+  if (!di || !(di.items || []).length) return '';
+  var b = di.items.map(function (x) {
+    var acts = (x.acts || []).map(function (a) {
+      var t = esc(a), cut = t.indexOf(' — ');
+      if (cut > 0) t = t.slice(0, cut) + ' <span class="dim">— ' + t.slice(cut + 3) + '</span>';
+      return '<li>' + t + '</li>';
+    }).join('');
+    var symp = (x.symp || []).filter(function (s) { return s.n; }).map(function (s) {
+      var sa = (s.acts || []).map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('');
+      return '<p style="margin:6px 0 2px"><b>' + esc(s.s) + '</b> <span class="dim">' +
+        s.n + '건 언급</span></p>' + (sa ? '<ul>' + sa + '</ul>' : '');
+    }).join('');
+    var vv = (x.valve || []).map(function (v) {
+      return '<span class="chip sm">' + esc(v) + '</span>';
+    }).join('');
+    return '<div style="border-top:1px solid var(--line);padding:8px 0 2px">' +
+      '<h4 style="margin:0 0 4px">' + esc(x.item) +
+      (x.sys ? ' <span class="chip sm">' + esc(x.sys) + ' 계열</span>' : '') +
+      ' <span class="dim">' + x.n + '건 언급</span></h4>' +
+      (acts ? '<ul>' + acts + '</ul>' : '') + symp +
+      (vv ? '<div class="chips">' + vv + '</div>' : '') + '</div>';
+  }).join('');
+  return '<details class="acc dat"><summary>항목별 분해 (WBC·RBC…)<span class="src">데이터</span>' +
+    '</summary><div class="body">' +
+    '<div class="note">' + esc(di.basis || '') +
+    ' WBC 계열(WNR·WDF·RET·WPC 등)은 FCM 계통, RBC·HCT·PLT 는 RBC 계통입니다.</div>' +
+    b + '</div></details>';
+}
+
+/* 스페셜 케이스 — 한 장비에서 같은 Error 로 90일 안에 4회 이상 다시 부른 건.
+   평균 조치 통계에는 안 보이는 "무엇을 시도했고 끝에 뭘 했는지" 순서를 보여 준다. */
+function specialHTML(e) {
+  var sp = e.special || [];
+  if (!sp.length) return '';
+  var b = sp.map(function (c) {
+    // 장시간 작업 — 방문 한 번인데 오래 걸린 건
+    if (c.kind === 'long') {
+      var li = (c.steps || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('');
+      var rp2 = (c.repl || []).map(function (x) {
+        return '<span class="chip sm">' + esc(x) + '</span>';
+      }).join('');
+      return '<div class="spc"><h4><span class="k long">장시간</span> ' +
+        c.hours + '시간' + (c.night ? ' <span class="k night">야간</span>' : '') +
+        (c.d ? ' · ' + esc(c.d) : '') +
+        (c.model ? ' <span class="dim">' + esc(c.model) + '</span>' : '') + '</h4>' +
+        (li ? '<ul>' + li + '</ul>' : '') +
+        (rp2 ? '<div class="chips">' + rp2 + '</div>' : '') + '</div>';
+    }
+    var vs = (c.visits || []).map(function (v, i) {
+      var last = i === c.visits.length - 1;
+      var li = (v.steps || []).map(function (s) {
+        return '<li>' + esc(s) + '</li>';
+      }).join('');
+      return '<div class="sv' + (last ? ' last' : '') + '">' +
+        '<div class="sh"><span class="no">' + (i + 1) + '</span>' + esc(v.d) +
+        (last ? ' <span class="chip sm">마지막 방문</span>' : '') + '</div>' +
+        (li ? '<ul>' + li + '</ul>' : '') + '</div>';
+    }).join('');
+    var rp = (c.repl || []).map(function (x) {
+      return '<span class="chip sm">' + esc(x) + '</span>';
+    }).join('');
+    return '<div class="spc">' +
+      '<h4><span class="k">반복</span> ' + c.n + '회 방문 · ' + c.days + '일' +
+      (c.model ? ' <span class="dim">' + esc(c.model) + '</span>' : '') + '</h4>' +
+      (rp ? '<p class="dim" style="margin:2px 0 6px">이 기간에 교체: </p>' +
+            '<div class="chips">' + rp + '</div>' : '') +
+      vs + '</div>';
+  }).join('');
+  // 난이도 배수 — 이 Error 가 평균보다 몇 배 자주 애먹었는지 (흔해서 뽑힌 것은 걸러짐)
+  var lf = sp[0] && sp[0].lift;
+  var lift = lf >= 1.5
+    ? '<p><b>이 Error 는 평균보다 ' + lf + '배 자주 애먹었습니다.</b> ' +
+      '<span class="dim">(같은 기준으로 센 전 장비 평균 대비)</span></p>' : '';
+  return '<details class="acc spec"><summary>스페셜 케이스 ' + sp.length +
+    '건' + (lf >= 1.5 ? ' <span class="tag sp">' + lf + '배</span>' : '') +
+    '<span class="src">현장</span></summary><div class="body">' + lift +
+    '<div class="note"><b>반복</b> = 같은 <b>장비(Serial)</b>에서 같은 Error 로 ' +
+    '<b>90일 안에 4회 이상</b> 다시 방문한 건. 시도한 순서 자체가 단서가 됩니다. ' +
+    '<b>마지막 방문의 조치가 정답이라는 뜻은 아닙니다</b> — 그 뒤로 같은 Error 기록이 ' +
+    '없다는 뜻입니다.<br><b>장시간</b> = 한 방문에 <b>8시간 이상</b> 걸린 건 ' +
+    '(고장 수리 · 그 방문에 Error 가 하나뿐인 것만). 소요시간은 시작~종료 시각이라 ' +
+    '대략의 크기이고, <b>야간</b>은 자정을 넘긴 출동이라 그 시간 내내 붙어 있었다는 ' +
+    '뜻은 아닙니다.<br>흔한 Error 는 그냥 확률적으로 많이 뽑히므로 <b>발생 건수로 ' +
+    '나눈 비율</b>이 평균의 3배 이상인 Error 만 싣습니다 (반복 6회·16시간 이상인 건은 ' +
+    '예외로 남깁니다).</div>' + b + '</div></details>';
+}
+
 function partsHTML(e) {
+  // p1 은 e.crm 아래, p2(전체 에러)는 최상위에 있다 — 둘 다 읽는다
   var c = e.crm || {};
-  var pn = c.pn || [], named = c.named || [], sens = c.sensors || [];
+  var pn = c.pn || e.pn || [], named = c.named || e.named || [],
+      sens = c.sensors || e.sensors || [];
   if (!pn.length && !named.length && !sens.length) return '';
   var b = '';
   if (pn.length) {
-    b += '<h4>실제 청구 부품 (부품 CRM)</h4><table class="pt"><tbody>' +
-      pn.slice(0, 10).map(function (r) {
-        return '<tr><td class="nm">' + esc(r.name) +
+    // 많이 교체한 순 — 출동 전에 위에서부터 챙기면 된다 (파이프라인이 건수순 정렬)
+    b += '<h4>많이 교체한 순 — 출동 전 챙길 부품</h4><table class="pt"><tbody>' +
+      pn.slice(0, 10).map(function (r, i) {
+        return '<tr><td class="nm"><b class="rk">' + (i + 1) + '</b>' + esc(r.name) +
           (r.pn ? '<span class="pn">' + esc(r.pn) + '</span>' : '') +
           '</td><td class="q">' + num(r.n) + '건</td></tr>';
       }).join('') + '</tbody></table>';
@@ -468,9 +569,14 @@ function partsHTML(e) {
       }).join('') + '</div>';
   }
   b += '<div class="note">건수는 그 Part 가 이 Error 방문에서 청구된 <b>방문 수</b>입니다. ' +
-       '발주 전 P/N 을 다시 확인하십시오.</div>';
-  return '<details class="acc crm"><summary>Related Parts<span class="src">현장</span>' +
-    '</summary><div class="body">' + b + '</div></details>';
+       '많이 교체한 순으로 정렬했습니다. 발주 전 P/N 을 다시 확인하십시오.</div>';
+  // 접힌 상태에서도 1위 부품이 보이게 — 출동 전에 펼치지 않고 확인할 수 있다
+  var top = pn.length ? pn[0] : null;
+  var peek = top
+    ? '<span class="cz">' + esc(top.name) +
+      (pn.length > 1 ? ' 외 ' + (pn.length - 1) : '') + '</span>' : '';
+  return '<details class="acc crm"><summary>Related Parts' + peek +
+    '<span class="src">현장</span></summary><div class="body">' + b + '</div></details>';
 }
 
 function relatedHTML(e, dev) {
@@ -488,8 +594,9 @@ function relatedHTML(e, dev) {
 }
 
 function quoteHTML(r) {
+  var cut = r.cut ? ' <span class="dim">(다른 Error 동반 방문 — 이 Error 구간만 발췌)</span>' : '';
   return '<blockquote><em>' + esc(r.date) + ' · ' + esc(r.inst) + ' · ' + esc(r.model) +
-    '</em>' + esc(r.text) + '</blockquote>';
+    cut + '</em>' + esc(r.text) + '</blockquote>';
 }
 
 function recordsHTML(e, more) {
@@ -501,7 +608,9 @@ function recordsHTML(e, more) {
     '">비슷한 사례 ' + more + '건 더 보기</button>' : '';
   return '<details class="acc crm"><summary>작업 기록 원문<span class="src">현장</span>' +
     '</summary><div class="body"><div id="cwrap">' + b + '</div>' + btn +
-    '<div class="note">CRM 작업 내용을 <b>고치지 않고</b> 그대로 옮긴 것입니다.</div>' +
+    '<div class="note">CRM 작업 내용을 <b>고치지 않고</b> 그대로 옮긴 것입니다. ' +
+    '한 방문에 Error 가 둘 이상이면 이 Error 와 이어지는 구간만 싣고, ' +
+    '가를 수 없으면 싣지 않습니다.</div>' +
     '</div></details>';
 }
 
@@ -532,8 +641,9 @@ function casesListHTML(cases, sel) {
     var tg = (c.tags || []).concat(c.valves || []).map(function (t) {
       return '<span class="chip sm">' + esc(t) + '</span>';
     }).join('');
+    var cut = c.cut ? ' <span class="dim">(다른 Error 동반 방문 — 이 Error 구간만 발췌)</span>' : '';
     return '<blockquote><em>' + esc(c.date) + ' · ' + esc(c.inst) + ' · ' + esc(c.model) +
-      '</em>' + esc(c.text) + (tg ? '<div class="chips">' + tg + '</div>' : '') +
+      cut + '</em>' + esc(c.text) + (tg ? '<div class="chips">' + tg + '</div>' : '') +
       '</blockquote>';
   }).join('');
 }
@@ -610,6 +720,7 @@ function renderError(dev, part, idx) {
   var d = devOf(dev);
   if (!d) return go('');
   backEl.hidden = false;
+  homeEl.hidden = false;
   view.innerHTML = '<div class="card"><div class="empty">불러오는 중…</div></div>';
 
   loadDevice(dev).then(function (j) {
@@ -633,7 +744,11 @@ function renderError(dev, part, idx) {
       '<div class="card head">' +
       '<div class="r2" style="margin:0 0 7px">' +
       '<span class="tag dv">' + esc(dev) + '</span>' +
-      (codes.length ? '<span class="tag cd">' + esc(codes.join(' / ')) + '</span>'
+      // 코드가 수십 개인 Error 가 있다 (CN 38101~ 처럼). 머리말에는 앞의 몇 개만
+      // 보이고 전체는 S/M Standard 안에 그대로 둔다 — 한 줄이 화면 폭을 밀어냈다.
+      (codes.length ? '<span class="tag cd">' +
+        esc(codes.slice(0, 3).join(' / ')) +
+        (codes.length > 3 ? ' 외 ' + (codes.length - 3) + '개' : '') + '</span>'
                     : '<span class="tag no">코드 없음</span>') +
       (part === '2' ? '<span class="tag p2">전체</span>' : '') + '</div>' +
       '<h1>' + esc(e.en) + '</h1>' +
@@ -645,8 +760,8 @@ function renderError(dev, part, idx) {
       '</div>';
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;
-    view.innerHTML = head + smHTML(e) + crmHTML(e) + partsHTML(e) +
-      relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e);
+    view.innerHTML = head + smHTML(e) + crmHTML(e) + specialHTML(e) + itemsHTML(e) +
+      partsHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e);
     var mb = $('#moreCases');
     if (mb) {
       mb.addEventListener('click', function () {
@@ -662,6 +777,7 @@ function renderSearch(q) {
   titleEl.textContent = '검색';
   subEl.textContent = '"' + q + '"';
   backEl.hidden = false;
+  homeEl.hidden = false;
   if (!INDEX) {
     view.innerHTML = '<div class="card"><div class="empty">검색 준비 중…</div></div>';
     ensureIndex().then(function () {
@@ -719,6 +835,12 @@ qx.addEventListener('click', function () { qEl.value = ''; qx.hidden = true; qEl
 backEl.addEventListener('click', function () {
   if (history.length > 1) history.back(); else go('');
 });
+// 몇 단계를 들어갔든 한 번에 처음 화면으로
+homeEl.addEventListener('click', function () {
+  qEl.value = ''; qx.hidden = true;
+  go('');
+  window.scrollTo(0, 0);
+});
 
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest('[data-go],[data-dev],[data-tab],[data-q],[data-find],#startTs');
@@ -753,6 +875,7 @@ function askPassword(msg) {
   titleEl.textContent = 'Sysmex TS Guide';
   subEl.textContent = '';
   backEl.hidden = true;
+  homeEl.hidden = true;
   document.body.classList.add('locked');
   view.innerHTML =
     '<div class="card lock">' +
