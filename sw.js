@@ -1,5 +1,5 @@
 /* Sysmex TS Guide — Service Worker (build_mobile.py 가 생성한다. 직접 고치지 않는다) */
-var VERSION = 'enc-0883f1e9-20260820-9db95322-2c845c';
+var VERSION = 'enc-0883f1e9-20260820-4c239e72-2c845c';
 var SHELL_CACHE = 'ts-shell-' + VERSION;
 var DATA_CACHE = 'ts-data-' + VERSION;
 var SHELL = ["./", "./index.html", "./css/app.css", "./js/app.js", "./manifest.webmanifest", "./fonts/brand.woff2", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
