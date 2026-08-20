@@ -239,7 +239,7 @@ function listHTML(rows, emptyMsg) {
 
 /* ── 화면 1: Home ─────────────────────────────────── */
 function renderHome() {
-  titleEl.innerHTML = '실마리 <span class="en">Sysmex TS Guide</span>';
+  titleEl.innerHTML = '<span class="ko">실마리</span><span class="en">Sysmex TS Guide</span>';
   subEl.textContent = META.devices.length + '개 장비 · 데이터 ' + META.v;
   backEl.hidden = true;
   homeEl.hidden = true;
@@ -441,8 +441,10 @@ function pmCsv() {
   lines.push('', [PM.basis].map(q).join(','));
   // 엑셀이 한글을 깨지 않게 BOM 을 붙인다
   var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  pmDownload(blob, 'PM확인_' + (h.serial || h.model || 'XN') + '_' +
-    (h.date || new Date().toISOString().slice(0, 10)) + '.csv');
+  // 파일명은 ASCII 로 둔다 — 한글 파일명이 안드로이드 파일앱·메일 첨부에서
+  // 깨지는 기기가 있다. 내용의 제목 줄에는 한글 제목이 그대로 들어간다.
+  pmDownload(blob, 'PM_Check_' + String(h.serial || h.model || 'XN').replace(/[^\w.-]/g, '') +
+    '_' + (h.date || new Date().toISOString().slice(0, 10)) + '.csv');
 }
 
 /* iPhone 은 a[download] 로 파일이 잘 안 떨어진다. 공유 시트가 되면 그쪽을 쓴다
@@ -815,7 +817,8 @@ function partsHTML(e) {
     b += '<h4>많이 교체한 순 — 출동 전 챙길 부품</h4><table class="pt"><tbody>' +
       pn.slice(0, 10).map(function (r, i) {
         return '<tr><td class="nm"><b class="rk">' + (i + 1) + '</b>' + esc(r.name) +
-          (r.pn ? '<span class="pn">' + esc(r.pn) + '</span>' : '') +
+          (r.pn ? '<span class="pn">' + esc(r.pn) + '</span>'
+                : '<span class="pn no">P/N 미등록</span>') +
           '</td><td class="q">' + num(r.n) + '건</td></tr>';
       }).join('') + '</tbody></table>';
   }
@@ -979,6 +982,48 @@ function dataHTML(e) {
     '</summary><div class="body">' + b + '</div></details>';
 }
 
+/* ── 피드백 ────────────────────────────────────────────
+   현장 엔지니어가 틀린 곳을 바로 알려 줄 수 있게 한다.
+   서버가 없으므로 mailto 로 연다 — 장비·Error·코드·데이터 버전은 본문에
+   미리 박아 둔다. 어느 화면에서 보낸 것인지 되묻지 않아도 되게. */
+var FEEDBACK_TO = 'hmson@sysmex.co.kr';   /* 받는 사람 — 바꾸려면 여기만 고친다 */
+
+function fbLink(dev, e, part) {
+  /* CN 처럼 코드가 수십 개인 Error 가 있다 — 메일 본문이 길어지면 잘리는
+     메일 앱이 있어 앞의 6개만 넣는다. 어느 Error 인지는 이것으로 충분하다. */
+  var cs = (e.codes && e.codes.length) ? e.codes : (e.code ? [e.code] : []);
+  var codes = cs.length
+    ? cs.slice(0, 6).join(' / ') + (cs.length > 6 ? ' 외 ' + (cs.length - 6) + '개' : '')
+    : '코드 없음';
+  var subj = '[실마리] ' + dev + ' · ' + e.en;
+  var body = [
+    '아래 줄은 자동으로 채워졌습니다. 그대로 두고 위에 적어 주십시오.',
+    '',
+    '무엇이 틀렸는지 / 실제로는 어떻게 해결했는지:',
+    '',
+    '',
+    '──────────────────────────',
+    '장비   : ' + dev,
+    'Error  : ' + e.en + (e.ko ? ' (' + e.ko + ')' : ''),
+    'Code   : ' + codes,
+    '위치   : ' + (part === '2' ? '전체 Error' : '주요 Error'),
+    '데이터 : ' + ((META && META.v) || '?'),
+    '기기   : ' + navigator.userAgent
+  ].join('\n');
+  return 'mailto:' + FEEDBACK_TO +
+         '?subject=' + encodeURIComponent(subj) +
+         '&body='    + encodeURIComponent(body);
+}
+
+function fbHTML(dev, e, part) {
+  return '<div class="card fb">' +
+    '<p>이 내용이 틀렸거나, 실제로는 다르게 해결하셨습니까?<br>' +
+    '알려 주시면 다음 갱신에 반영합니다. 장비·Error·데이터 버전은 자동으로 들어갑니다.</p>' +
+    '<a class="fbbtn" href="' + esc(fbLink(dev, e, part)) + '">내용 고쳐주세요</a>' +
+    '<p class="muted">메일 앱이 열리지 않으면 <b>' + esc(FEEDBACK_TO) + '</b> 로 보내 주십시오.</p>' +
+    '</div>';
+}
+
 function renderError(dev, part, idx) {
   var d = devOf(dev);
   if (!d) return go('');
@@ -1024,7 +1069,8 @@ function renderError(dev, part, idx) {
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;
     view.innerHTML = head + smHTML(e) + crmHTML(e) + specialHTML(e) + itemsHTML(e) +
-      partsHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e);
+      partsHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
+      fbHTML(dev, e, part);
     var mb = $('#moreCases');
     if (mb) {
       mb.addEventListener('click', function () {
@@ -1145,7 +1191,7 @@ window.addEventListener('hashchange', route);
 /* ── 잠금 화면 ─────────────────────────────────────── */
 function askPassword(msg) {
   boot.remove();
-  titleEl.innerHTML = '실마리 <span class="en">Sysmex TS Guide</span>';
+  titleEl.innerHTML = '<span class="ko">실마리</span><span class="en">Sysmex TS Guide</span>';
   subEl.textContent = '';
   backEl.hidden = true;
   homeEl.hidden = true;

@@ -1,8 +1,8 @@
 /* Sysmex TS Guide — Service Worker (build_mobile.py 가 생성한다. 직접 고치지 않는다) */
-var VERSION = 'enc-efc30594-20260820-0f40d381';
+var VERSION = 'enc-0883f1e9-20260820-fad0b7b5-e7596b';
 var SHELL_CACHE = 'ts-shell-' + VERSION;
 var DATA_CACHE = 'ts-data-' + VERSION;
-var SHELL = ["./", "./index.html", "./css/app.css", "./js/app.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
+var SHELL = ["./", "./index.html", "./css/app.css", "./js/app.js", "./manifest.webmanifest", "./fonts/brand.woff2", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
 var DATA = ["./data/devices.json.enc", "./data/search-index.json.enc", "./data/device/XN.json.enc", "./data/device/XN-L.json.enc", "./data/device/CN.json.enc", "./data/device/SP-50.json.enc", "./data/device/UF.json.enc", "./data/device/UC.json.enc", "./data/device/HISCL.json.enc", "./data/device/G11.json.enc", "./data/device/TS-10.json.enc", "./data/cases/XN.json.enc", "./data/cases/XN-L.json.enc", "./data/cases/CN.json.enc", "./data/cases/SP-50.json.enc", "./data/cases/UF.json.enc", "./data/cases/UC.json.enc", "./data/cases/HISCL.json.enc", "./data/cases/G11.json.enc", "./data/cases/TS-10.json.enc", "./data/pm.json.enc", "./data/_auth.json"];
 
 self.addEventListener('install', function (e) {
