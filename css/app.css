@@ -441,3 +441,22 @@ blockquote em{display:block;font-style:normal;font-size:11.5px;
 .fbbtn:active{background:var(--pri);color:#fff}
 /* CRM 에 P/N 이 안 적힌 부품 — 화면 오류가 아니라 원본에 없다는 뜻이다 */
 .pt .pn.no{background:transparent;border:1px dashed var(--line);color:var(--dim)}
+
+/* ── 고지 ─────────────────────────────────────────────
+   읽히되 조치 내용을 가리지 않게. 경고가 아니라 근거 표시에 가깝다. */
+.card.disc{background:#fbfcfd;border-color:#dde3ea;box-shadow:none}
+.card.disc h4{
+  margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.04em;
+  color:var(--mid);text-transform:none;
+}
+.card.disc p{margin:0 0 7px;font-size:12.5px;line-height:1.65;color:var(--mid)}
+.card.disc p:last-child{margin-bottom:0}
+.card.disc b{color:var(--ink)}
+.card.disc .dim{font-size:11.5px;color:var(--dim)}
+.card.disc .dim b{color:var(--dim)}
+/* 에러 화면 맨 아래 한 줄 */
+.discline{
+  margin:14px 2px 4px;font-size:11.5px;line-height:1.6;
+  color:var(--dim);text-align:center;
+}
+.discline b{color:var(--mid);font-weight:700}

@@ -238,6 +238,26 @@ function listHTML(rows, emptyMsg) {
 }
 
 /* ── 화면 1: Home ─────────────────────────────────── */
+/* ── 고지 ──────────────────────────────────────────────
+   이 가이드는 CRM 수리 이력을 모아 정리한 참고자료다. 정식 문서가 아니다.
+   50명이 현장에서 이걸 보고 장비를 만지므로, 근거와 한계를 화면에 밝혀 둔다.
+   기간은 실제로 실린 기록에서 뽑은 값이라 갱신할 때마다 저절로 맞는다. */
+function noticeHTML() {
+  var period = (META && META.period) ? META.period.replace('~', ' ~ ') : '';
+  return '<div class="sec"><div class="card disc">' +
+    '<h4>이 가이드에 대하여</h4>' +
+    '<p>Sysmex Korea CRM 의 <b>실제 수리 이력</b>' +
+    (period ? '(' + esc(period) + ')' : '') +
+    ' 과 <b>Service Manual</b> 을 정리한 <b>참고자료</b>입니다. ' +
+    '정식 기술문서가 아니며, 조치의 적절성을 보증하지 않습니다.</p>' +
+    '<p><b>최종 판단과 조치는 해당 장비의 정식 Service Manual · IFU 를 따릅니다.</b> ' +
+    '두 내용이 다르면 정식 문서가 우선합니다.</p>' +
+    // 데이터 버전은 바로 위 오프라인 카드에 이미 있다 — 여기서 또 적지 않는다
+    '<p class="dim">거래처명은 모두 가렸습니다 · 사내 전용</p>' +
+    '</div></div>';
+}
+
+
 function renderHome() {
   titleEl.innerHTML = '<span class="ko">실마리</span><span class="en">Sysmex TS Guide</span>';
   subEl.textContent = META.devices.length + '개 장비 · 데이터 ' + META.v;
@@ -279,7 +299,7 @@ function renderHome() {
     '<div class="sec"><h2>자주 발생하는 Error</h2>' +
     '<div class="card rows">' + hot + '</div>' +
     '<p class="muted">발생 건수 기준 상위입니다. 장비를 고르면 그 장비의 전체 목록이 나옵니다.</p></div>' +
-    pmCard + offlineCardHTML();
+    pmCard + offlineCardHTML() + noticeHTML();
 }
 
 /* ── 화면 5: PM 후 확인 체크리스트 ──────────────────────
@@ -1021,7 +1041,10 @@ function fbHTML(dev, e, part) {
     '알려 주시면 다음 갱신에 반영합니다. 장비·Error·데이터 버전은 자동으로 들어갑니다.</p>' +
     '<a class="fbbtn" href="' + esc(fbLink(dev, e, part)) + '">내용 고쳐주세요</a>' +
     '<p class="muted">메일 앱이 열리지 않으면 <b>' + esc(FEEDBACK_TO) + '</b> 로 보내 주십시오.</p>' +
-    '</div>';
+    '</div>' +
+    // 조치 화면마다 한 줄. 홈의 전체 고지와 같은 내용을 줄인 것이다.
+    '<p class="discline">CRM 수리 이력 기반 <b>참고자료</b>입니다. ' +
+    '최종 조치는 정식 <b>Service Manual · IFU</b> 를 따릅니다.</p>';
 }
 
 function renderError(dev, part, idx) {
