@@ -460,3 +460,32 @@ blockquote em{display:block;font-style:normal;font-size:11.5px;
   color:var(--dim);text-align:center;
 }
 .discline b{color:var(--mid);font-weight:700}
+
+/* 마지막 교체 단계 — 앞 단계를 다 확인한 뒤에 오는 자리 */
+.stage.s3 .no{background:var(--warn)}
+.stage.s3{border-left:3px solid var(--warn)}
+.stage.s3 .sh{color:var(--warn)}
+/* 실제로 해결로 이어진 조치 — 건수(많이 한 것)와 구분한다 */
+.chk b.ok{color:var(--crm);font-weight:800}
+
+/* 원인 (현장 기록) */
+.cz-list{margin:0;padding-left:18px}
+.cz-list li{margin:0 0 7px;line-height:1.6;font-size:14px}
+.cz-list li:last-child{margin-bottom:0}
+
+/* 부품 P/N — 구형(단종) 구분과 마지막 발주 시점 */
+.pt .pn.old{color:var(--dim);text-decoration:line-through}
+.pt .newpn{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  background:#e8f3ec;color:var(--crm);font-size:11.5px;font-weight:700}
+.pt .lastuse{display:inline-block;margin-left:6px;color:var(--dim);font-size:11.5px}
+.note b.oldtag{color:var(--dim);text-decoration:line-through}
+
+/* 점검 기준 표 — 항목 / 기준값 / 출처. 출처는 현장에서 매뉴얼을 바로 펼 수 있게
+   반드시 같이 보인다 (수치만 있으면 믿고 쓰기 어렵다). */
+table.spt{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 10px}
+table.spt th,table.spt td{border-top:1px solid var(--line);padding:6px 4px;
+  text-align:left;vertical-align:top}
+table.spt th{font-weight:600;color:var(--mid);width:38%;font-size:12px}
+table.spt td{color:var(--fg)}
+.sq{color:var(--dim);font-size:11px;font-weight:400;white-space:nowrap}
+table.spt td.sq{width:24%;white-space:normal}

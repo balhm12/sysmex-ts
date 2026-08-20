@@ -30,8 +30,16 @@ function esc(t) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-/* 데이터에는 <b> 만 들어 있다 (build_simple 과 같은 규칙) */
-function rich(t) { return esc(t).replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>'); }
+/* 데이터에 허용하는 태그는 <b> 와 두 종류의 표시용 태그뿐이다.
+   나머지는 전부 이스케이프한다 — 화이트리스트 방식이라 새 태그가 섞여도 안전하다. */
+function rich(t) {
+  return esc(t)
+    // esc() 가 따옴표까지 &quot; 로 바꾸므로 그 형태로 되돌린다
+    .replace(/&lt;b class=&quot;ok&quot;&gt;/g, '<b class="ok">')
+    .replace(/&lt;span class=&quot;dim&quot;&gt;/g, '<span class="dim">')
+    .replace(/&lt;\/span&gt;/g, '</span>')
+    .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
+}
 function num(n) { return (n || 0).toLocaleString('ko-KR'); }
 
 function unzipB64(b64) {
@@ -659,8 +667,9 @@ function bar(cs) {
 function stagesHTML(steps) {
   if (!steps || !steps.length) return '<div class="empty">조치 기록이 없습니다</div>';
   return steps.map(function (s, si) {
-    var cls = s.kind === 0 ? 'sm0' : (s.kind === 1 ? 's1' : 's2');
-    var no = s.kind === 0 ? '·' : String(s.kind);
+    // kind 3 = 마지막 교체 단계. 앞 단계를 다 확인한 뒤에 오는 자리라 색을 달리한다
+    var cls = s.kind === 0 ? 'sm0' : (s.kind === 1 ? 's1' : (s.kind === 3 ? 's3' : 's2'));
+    var no = s.kind === 0 ? '·' : (s.kind === 3 ? '↓' : String(s.kind));
     var items = (s.items || []).map(function (it, ii) {
       var id = 'c' + si + '_' + ii;
       // 조치 자체가 눈에 들어오게 — "—" 뒤의 건수·사례 설명은 작고 연하게
@@ -692,7 +701,8 @@ function smHTML(e) {
     b += '<h4>구분</h4><p>' + esc([o.etype, o.elevel].filter(Boolean).join(' · ')) + '</p>';
   }
   if (m.meaning) b += '<h4>Meaning</h4><p>' + esc(m.meaning) + '</p>';
-  if ((o.reasons || []).length) {
+  // 점검 기준 블록이 같은 내용을 수치 위주로 이미 싣는다 — 두 번 쓰지 않는다
+  if ((o.reasons || []).length && !((e.specs || {}).detect || []).length) {
     b += '<h4>검출 조건</h4><ul>' +
       o.reasons.slice(0, 4).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
   }
@@ -712,11 +722,53 @@ function smHTML(e) {
     '</summary><div class="body">' + b + '</div></details>';
 }
 
+/* 점검 기준 — "얼마여야 정상인가".
+   조치 절차에는 "압력 확인" · "감도 조정" 이 많은데 기준값이 없어
+   현장에서 매뉴얼을 다시 뒤져야 했다 (현장 요청 2026-08).
+   두 층을 나눠 싣는다.
+     조정 기준 = S/M 이 맞추라고 한 값   (Ch.4 Adjustment · Ch.5 Service Program)
+     검출 기준 = S/M 이 에러로 보는 조건 (Ch.6 Error Messages 원문)
+   전부 매뉴얼 원문이며 출처(절·쪽)를 같이 적는다. 추정은 넣지 않는다. */
+function specsHTML(e) {
+  var s = e.specs;
+  if (!s) return '';
+  var items = s.items || [], det = s.detect || [];
+  if (!items.length && !det.length) return '';
+  var b = '';
+  if (items.length) {
+    b += '<h4>조정 기준 — 얼마로 맞추는가</h4><table class="spt"><tbody>' +
+      items.map(function (x) {
+        return '<tr><th>' + esc(x[0]) + '</th><td>' + rich(x[1]) +
+          '</td><td class="sq">' + esc(x[2] || '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    if (s.how) b += '<p class="muted">' + rich(s.how) + '</p>';
+  }
+  if (det.length) {
+    b += '<h4>검출 기준 — S/M 이 Error 로 보는 조건' +
+      (s.src ? ' <span class="sq">' + esc(s.src) + '</span>' : '') + '</h4><ul>' +
+      det.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  }
+  if (s.note) b += '<div class="note">' + rich(s.note) + '</div>';
+  b += '<div class="note">수치는 <b>Service Manual 표기 그대로</b>입니다. ' +
+    '측정 조건(기동 중 / 분석 중)이 다르면 판정값도 다릅니다.</div>';
+  var peek = '<span class="cz">' +
+    esc(items.length ? items[0][1].replace(/<[^>]+>/g, '') : det[0]).slice(0, 28) +
+    '</span>';
+  return '<details class="acc sm" open><summary>점검 기준 (기준값)' + peek +
+    '<span class="src">공식</span></summary><div class="body">' + b + '</div></details>';
+}
+
 function crmHTML(e) {
   var c = e.crm || {};
   var b = '';
   if (e.cause) b += '<p>' + rich(e.cause) + '</p>';
-  b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps);
+  b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps) +
+    // 숫자 두 개의 뜻이 다르다 — 한 줄로 밝혀 둔다
+    '<p class="muted">앞의 <b>N건</b>은 그 조치를 한 횟수, ' +
+    '<b class="ok">해결 N/M</b>은 그 조치를 한 방문 M건 중 ' +
+    '<b>실패 신호 뒤에 하고 「양호」로 끝난</b> 것이 N건이라는 뜻입니다. ' +
+    '많이 한 조치와 실제로 해결한 조치는 다릅니다. ' +
+    '<b>교체는 앞의 확인·세정·조정을 마친 뒤 마지막에 합니다.</b></p>';
   if (e.verify) b += '<h4>조치 후 확인</h4><p>' + rich(e.verify) + '</p>';
   if (e.caution) b += '<h4>주의사항</h4><p>' + rich(e.caution) + '</p>';
   return '<details class="acc crm" open><summary>CRM Actual<span class="src">현장</span>' +
@@ -837,8 +889,11 @@ function partsHTML(e) {
     b += '<h4>많이 교체한 순 — 출동 전 챙길 부품</h4><table class="pt"><tbody>' +
       pn.slice(0, 10).map(function (r, i) {
         return '<tr><td class="nm"><b class="rk">' + (i + 1) + '</b>' + esc(r.name) +
-          (r.pn ? '<span class="pn">' + esc(r.pn) + '</span>'
+          (r.pn ? '<span class="pn' + (r.old ? ' old' : '') + '">' + esc(r.pn) + '</span>'
                 : '<span class="pn no">P/N 미등록</span>') +
+          // 같은 부품인데 더 최근에 쓴 P/N 이 따로 있으면 그쪽을 발주해야 한다
+          (r.old ? '<span class="newpn">현행 ' + esc(r.old) + '</span>' : '') +
+          (r.last ? '<span class="lastuse">최근 ' + esc(r.last) + '</span>' : '') +
           '</td><td class="q">' + num(r.n) + '건</td></tr>';
       }).join('') + '</tbody></table>';
   }
@@ -854,7 +909,10 @@ function partsHTML(e) {
         return '<span class="chip">' + esc(x[0]) + '<i>' + x[1] + '</i></span>';
       }).join('') + '</div>';
   }
-  b += '<div class="note">건수는 그 Part 가 이 Error 방문에서 청구된 <b>방문 수</b>입니다. ' +
+  b += '<div class="note">건수는 그 Part 가 이 Error 방문에서 청구된 <b>방문 수</b>이고, ' +
+       '<b>최근</b>은 마지막으로 발주한 달입니다. ' +
+       '<b class="oldtag">구형</b> 이 붙은 것은 같은 부품의 더 최근 P/N 이 따로 있다는 뜻이니 ' +
+       '<b>현행</b> 번호로 발주하십시오. ' +
        '많이 교체한 순으로 정렬했습니다. 발주 전 P/N 을 다시 확인하십시오.</div>';
   // 접힌 상태에서도 1위 부품이 보이게 — 출동 전에 펼치지 않고 확인할 수 있다
   var top = pn.length ? pn[0] : null;
@@ -1047,6 +1105,25 @@ function fbHTML(dev, e, part) {
     '최종 조치는 정식 <b>Service Manual · IFU</b> 를 따릅니다.</p>';
 }
 
+/* ── 원인 (현장 기록) ──────────────────────────────────
+   CRM '원인 및 결과' 열에 엔지니어가 직접 적은 원인. 조치 빈도에서 역산한
+   추정과 성격이 다르므로 따로 둔다. 기본은 접어 두어 조치 화면을 안 밀어낸다. */
+function notesHTML(e) {
+  var ns = e.notes || (e.crm || {}).notes || [];
+  if (!ns.length) return '';
+  var peek = '<span class="cz">' + esc(ns[0][0].slice(0, 26)) +
+    (ns.length > 1 ? ' 외 ' + (ns.length - 1) : '') + '</span>';
+  return '<details class="acc crm"><summary>원인 (현장 기록)' + peek +
+    '<span class="src">현장</span></summary><div class="body">' +
+    '<ul class="cz-list">' + ns.map(function (x) {
+      return '<li>' + rich(x[0]) +
+        (x[1] > 1 ? ' <span class="dim">— ' + x[1] + '건</span>' : '') + '</li>';
+    }).join('') + '</ul>' +
+    '<div class="note">CRM 의 <b>원인 및 결과</b> 칸에 엔지니어가 직접 적은 내용입니다. ' +
+    '집계에서 역산한 추정이 아니라 <b>기록된 원인</b>이며, 정형 문구는 걸렀습니다.</div>' +
+    '</div></details>';
+}
+
 function renderError(dev, part, idx) {
   var d = devOf(dev);
   if (!d) return go('');
@@ -1091,8 +1168,8 @@ function renderError(dev, part, idx) {
       '</div>';
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;
-    view.innerHTML = head + smHTML(e) + crmHTML(e) + specialHTML(e) + itemsHTML(e) +
-      partsHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
+    view.innerHTML = head + specsHTML(e) + smHTML(e) + crmHTML(e) + specialHTML(e) + itemsHTML(e) +
+      notesHTML(e) + partsHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
       fbHTML(dev, e, part);
     var mb = $('#moreCases');
     if (mb) {
