@@ -892,7 +892,9 @@ function partsHTML(e) {
           (r.pn ? '<span class="pn' + (r.old ? ' old' : '') + '">' + esc(r.pn) + '</span>'
                 : '<span class="pn no">P/N 미등록</span>') +
           // 같은 부품인데 더 최근에 쓴 P/N 이 따로 있으면 그쪽을 발주해야 한다
-          (r.old ? '<span class="newpn">현행 ' + esc(r.old) + '</span>' : '') +
+          (r.disc ? '<span class="newpn disc">' + esc(r.disc) + ' 단종</span>' : '') +
+          (r.old ? '<span class="newpn">현행 ' + esc(r.old) +
+            (r.oldname ? ' · ' + esc(r.oldname) : '') + '</span>' : '') +
           (r.last ? '<span class="lastuse">최근 ' + esc(r.last) + '</span>' : '') +
           '</td><td class="q">' + num(r.n) + '건</td></tr>';
       }).join('') + '</tbody></table>';
