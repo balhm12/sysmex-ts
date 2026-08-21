@@ -262,6 +262,11 @@ function noticeHTML() {
     '두 내용이 다르면 정식 문서가 우선합니다.</p>' +
     // 데이터 버전은 바로 위 오프라인 카드에 이미 있다 — 여기서 또 적지 않는다
     '<p class="dim">거래처명은 모두 가렸습니다 · 사내 전용</p>' +
+    // 세고 있다는 사실은 화면에 밝힌다. 몰래 세면 도구를 안 믿게 된다.
+    (STAT && STAT.on() ?
+      '<p class="dim">어느 Error 를 많이 찾는지 <b>익명으로만</b> 셉니다 — ' +
+      '다음에 무엇을 보강할지 정하는 데 씁니다. ' +
+      '누가 봤는지·검색어·작업 기록은 기록하지 않습니다.</p>' : '') +
     '</div></div>';
 }
 
@@ -1188,6 +1193,9 @@ function renderError(dev, part, idx) {
 
     titleEl.textContent = e.en;
     subEl.textContent = d.name + ' · ' + (part === '2' ? '전체 Error' : '주요 Error');
+    // 어느 Error 를 실제로 찾아보는지만 익명으로 센다 (js/stat.js 참고).
+    // 목록을 스쳐 지나간 것이 아니라 **상세를 연 것**만 센다.
+    try { STAT.view(dev, e.en); } catch (ex) { /* 통계는 절대 화면을 막지 않는다 */ }
 
     var codes = (e.codes && e.codes.length) ? e.codes : (e.code ? [e.code] : []);
     var r = e.recur || {};
@@ -1400,6 +1408,8 @@ function start() {
       var idle = window.requestIdleCallback ||
                  function (f) { return setTimeout(f, 1); };
       idle(function () { ensureIndex(); initSW(); });   // 검색 인덱스·오프라인 준비는 뒤이어
+      // 잠금을 푼 뒤에만 센다 — 비밀번호를 모르는 접근은 사용이 아니다
+      try { STAT.open(META.v); } catch (ex) { /* 무시 */ }
     })
     .catch(function (err) {
       if (AUTH) {                               // 키가 상했을 수 있다 — 다시 묻는다
