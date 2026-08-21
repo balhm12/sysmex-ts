@@ -27,10 +27,11 @@
 'use strict';
 
 var STAT = (function () {
-  /* ── 여기 한 줄만 채우면 켜진다 ──────────────────────────
-     예) 'https://<프로젝트>-default-rtdb.asia-southeast1.firebasedatabase.app'
-     비워 두면 통계 기능 전체가 꺼진 채로 돈다 (네트워크 호출 없음). */
-  var ENDPOINT = 'https://silmari-ts-default-rtdb.asia-southeast1.firebasedatabase.app';
+  /* ── 쌓는 곳 ──────────────────────────────────────────────
+     비워 두면 통계 기능 전체가 꺼진 채로 돈다 (네트워크 호출 없음).
+     끝의 '/' 는 떼어 낸다 — 붙어 있으면 '//stat/...' 가 되어 경로가 어긋난다. */
+  var ENDPOINT = 'https://silmari-ts-default-rtdb.asia-southeast1.firebasedatabase.app'
+                 .replace(/\/+$/, '');
 
   var AID_KEY = 'ts-aid';        // 기기 번호 (익명)
   var Q_KEY = 'ts-statq';        // 못 보낸 것 (오프라인)

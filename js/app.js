@@ -558,6 +558,18 @@ function pmPdf() {
 }
 
 /* ── 오프라인 / 설치 ──────────────────────────────── */
+/* 못 보낸 사용량 기록이 쌓여 있으면 밝힌다.
+   통계는 실패해도 화면이 멀쩡해서 **조용히 안 쌓인다**. Firebase 규칙이 잠겨
+   있으면 몇 달 뒤에야 알아채게 되므로, 밀린 것이 있으면 여기 한 줄로 보인다.
+   0건이면 아무것도 안 나온다 — 평소 화면을 어지럽히지 않는다. */
+function statPending() {
+  try {
+    if (!STAT.on()) return '';
+    var n = (JSON.parse(localStorage.getItem('ts-statq') || '[]') || []).length;
+    return n > 5 ? ' · <b>사용량 기록 ' + n + '건 못 보냄</b>' : '';
+  } catch (e) { return ''; }
+}
+
 function offlineCardHTML() {
   if (!('serviceWorker' in navigator)) return '';
   var saved = localStorage.getItem('ts-offline-v');
@@ -569,7 +581,7 @@ function offlineCardHTML() {
     '<button class="obtn" id="saveAll">' +
     (ok ? '다시 받기' : '오프라인용으로 전부 저장') + '</button>' +
     '<p class="muted">현장에 나가기 전에 한 번 눌러 두면 인터넷이 없어도 전부 열립니다. ' +
-    '데이터 ' + esc(META.v) + '</p></div></div>';
+    '데이터 ' + esc(META.v) + statPending() + '</p></div></div>';
 }
 
 function banner(html, action, label) {
@@ -665,8 +677,15 @@ function bar(cs) {
       '<span class="bar"><i style="width:' + Math.round(x.pct / max * 100) + '%"></i></span>' +
       '<span class="pc">' + x.pct + '%</span></div>';
   }).join('') +
-    '<p class="muted">CRM 첫 조치 ' + num(cs.total) + '건의 분포입니다. ' +
-    '조치에서 역산한 <b>추정</b>이며 원인 판정 결과가 아닙니다.</p></div>';
+    // 분모는 '작업 기록 건수'다. 조치 합을 100% 로 잡으면 조치가 하나뿐일 때
+    // 무조건 100% 가 되어, 기록 6건 중 2건짜리 마무리 동작이 '이게 원인' 처럼 보인다.
+    '<p class="muted">작업 기록 ' + num(cs.base || cs.total) + '건 중 첫 조치 ' +
+    num(cs.total) + '건의 분포입니다. ' +
+    '조치에서 역산한 <b>추정</b>이며 원인 판정 결과가 아닙니다.' +
+    (cs.cover && cs.cover < 50
+      ? '<br><b>기록의 ' + cs.cover + '% 에서만 조치가 확인됐습니다 — ' +
+        '아래 교체 부품을 함께 보십시오.</b>' : '') +
+    '</p></div>';
 }
 
 function stagesHTML(steps) {
@@ -767,6 +786,14 @@ function crmHTML(e) {
   var c = e.crm || {};
   var b = '';
   if (e.cause) b += '<p>' + rich(e.cause) + '</p>';
+  // 근거가 얇은 카드는 조치 위에 먼저 밝힌다. 조치를 본 **뒤에** 알려 주면
+  // 이미 그대로 하고 있다. 확실한 두 가지(S/M · 부품 P/N)로 보낸다.
+  if (e.warn && e.warn.why && e.warn.why.length) {
+    b += '<div class="softwarn"><b>이 조치 순서는 근거가 얇습니다</b>' +
+      '<ul>' + e.warn.why.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') +
+      '</ul><span>위의 <b>S/M Standard</b> 와 아래 <b>관련 부품</b>(<b>S/M 지정</b> 배지가 있으면 그것부터)' +
+      ' 을 함께 보고 판단하십시오.</span></div>';
+  }
   b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps) +
     // 숫자 두 개의 뜻이 다르다 — 한 줄로 밝혀 둔다
     '<p class="muted">앞의 <b>N건</b>은 그 조치를 한 횟수, ' +
