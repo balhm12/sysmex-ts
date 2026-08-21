@@ -62,14 +62,16 @@ header .bar .brand{flex:1;min-width:0}
 /* 홈 버튼 — 아이콘만으로는 안 보인다는 지적. 글씨를 같이 넣고 테두리를 준다 */
 /* 장갑 낀 손으로도 눌리게 키웠다 (현장 지적 2026-08).
    손가락 접촉면 권장 최소 44px 를 맞추고, 테두리를 굵게 해 눈에 먼저 걸리게 한다. */
-.hbtn{flex:none;display:flex;align-items:center;gap:6px;height:44px;padding:0 16px;
-  border:2px solid rgba(255,255,255,.85);border-radius:12px;cursor:pointer;
-  background:rgba(255,255,255,.28);color:#fff;font-size:16px;font-weight:800;
-  letter-spacing:-.2px;box-shadow:0 1px 3px rgba(0,0,0,.18)}
-.hbtn:active{background:rgba(255,255,255,.45);transform:translateY(1px)}
-.hbtn .hi{font-size:19px;line-height:1}
+/* 한 번 더 키웠다 (현장 지적 2026-08-21). 44px 는 '겨우 눌리는' 크기이고,
+   장비 앞에서 한 손으로 쓸 때는 보지 않고도 닿을 만큼 커야 한다. */
+.hbtn{flex:none;display:flex;align-items:center;gap:8px;height:56px;padding:0 22px;
+  border:3px solid #fff;border-radius:14px;cursor:pointer;
+  background:rgba(255,255,255,.38);color:#fff;font-size:19px;font-weight:900;
+  letter-spacing:-.2px;box-shadow:0 2px 6px rgba(0,0,0,.24)}
+.hbtn:active{background:rgba(255,255,255,.55);transform:translateY(1px)}
+.hbtn .hi{font-size:24px;line-height:1}
 /* 헤더가 접혀도 크기를 줄이지 않는다 — 접힌 뒤가 오히려 더 많이 쓰인다 */
-header.compact .hbtn{height:40px;padding:0 14px;font-size:15px}
+header.compact .hbtn{height:52px;padding:0 20px;font-size:18px}
 /* 스크롤해서 헤더가 접히면 홈 버튼만 남긴다 */
 header.compact .made{display:none}
 header .brand{min-width:0;flex:1}
