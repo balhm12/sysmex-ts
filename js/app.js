@@ -885,8 +885,9 @@ function diagHTML(e) {
     '<span class="tag">S/M</span></h3>' +
     '<div class="diagnote">' + esc(d.note || '') +
     (d.valves && d.valves.length ? ' — <b>' + esc(d.valves.join(' · ')) + '</b>' : '') +
-    '</div><div class="diagwrap"><img src="img/diag/' + esc(d.img) +
-    '" alt="Hydraulic Diagram" loading="lazy"></div></div>';
+    '</div><div class="diagwrap" onclick="this.classList.toggle(\'zoom\')">' +
+    '<img src="img/diag/' + esc(d.img) + '" alt="Hydraulic Diagram" loading="lazy">' +
+    '<span class="diaghint">탭하면 크게 · 다시 탭하면 원래대로</span></div></div>';
 }
 
 function swNoteHTML(e) {

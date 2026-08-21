@@ -513,8 +513,16 @@ table.spt td.sq{width:24%;white-space:normal}
 .smpn{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:6px;
   font-size:11px;font-weight:800;background:#e8f0ff;color:#1c3f7a;border:1px solid #b9cdf0}
 
-/* Hydraulic Diagram 조각 — 손가락으로 확대해 볼 수 있게 가로 스크롤 */
+/* Hydraulic Diagram 조각
+   기본은 화면 폭에 맞춘다 — 처음부터 옆으로 밀어야 하면 있는 줄도 모른다.
+   탭하면 원래 크기로 커지고 그때부터 좌우로 민다 (현장 요청 2026-08-21). */
 .diagnote{margin:2px 0 9px;font-size:13px;line-height:1.55;color:#5b6472}
-.diagwrap{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid #dfe4ec;
-  border-radius:10px;background:#fff}
-.diagwrap img{display:block;min-width:100%;max-width:none;height:auto}
+.diagwrap{position:relative;overflow:hidden;border:1px solid #dfe4ec;
+  border-radius:10px;background:#fff;cursor:zoom-in}
+.diagwrap img{display:block;width:100%;height:auto}
+.diagwrap.zoom{overflow:auto;-webkit-overflow-scrolling:touch;cursor:zoom-out}
+.diagwrap.zoom img{width:auto;max-width:none;min-width:100%}
+.diaghint{position:absolute;right:8px;bottom:8px;padding:4px 9px;border-radius:7px;
+  font-size:11px;font-weight:700;background:rgba(28,63,122,.86);color:#fff;
+  pointer-events:none}
+.diagwrap.zoom .diaghint{position:sticky;left:8px;float:left}
