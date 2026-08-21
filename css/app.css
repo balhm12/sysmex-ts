@@ -521,7 +521,11 @@ table.spt td.sq{width:24%;white-space:normal}
   border-radius:10px;background:#fff;cursor:zoom-in}
 .diagwrap img{display:block;width:100%;height:auto}
 .diagwrap.zoom{overflow:auto;-webkit-overflow-scrolling:touch;cursor:zoom-out}
-.diagwrap.zoom img{width:auto;max-width:none;min-width:100%}
+/* 원래 크기(width:auto)로 키우면 안 된다. 도면을 2600px 로 뽑으면서
+   휴대폰 화면에서는 7배가 되어 밸브 하나도 화면에 다 안 들어온다.
+   읽을 만한 배율(2.6배)로 못 박고, 남는 해상도는 선명함으로 쓴다. */
+.diagwrap.zoom img{width:260%;max-width:none}
+.diagwrap.zoom{max-height:78vh}
 .diaghint{position:absolute;right:8px;bottom:8px;padding:4px 9px;border-radius:7px;
   font-size:11px;font-weight:700;background:rgba(28,63,122,.86);color:#fff;
   pointer-events:none}

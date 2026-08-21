@@ -885,9 +885,29 @@ function diagHTML(e) {
     '<span class="tag">S/M</span></h3>' +
     '<div class="diagnote">' + esc(d.note || '') +
     (d.valves && d.valves.length ? ' — <b>' + esc(d.valves.join(' · ')) + '</b>' : '') +
-    '</div><div class="diagwrap" onclick="this.classList.toggle(\'zoom\')">' +
+    '</div><div class="diagwrap" data-focus="' +
+    esc((d.focus || []).join(',')) + '" onclick="diagZoom(this)">' +
     '<img src="img/diag/' + esc(d.img) + '" alt="Hydraulic Diagram" loading="lazy">' +
-    '<span class="diaghint">탭하면 크게 · 다시 탭하면 원래대로</span></div></div>';
+    '<span class="diaghint">탭하면 밸브 자리로 확대</span></div></div>';
+}
+
+function diagZoom(w) {
+  // 키울 때 왼쪽 위 구석을 보여 주면 대개 도면 제목이 나온다 — 쓸모가 없다.
+  // 표시한 밸브 자리(focus)를 화면 가운데로 옮긴다.
+  var on = w.classList.toggle('zoom');
+  var hint = w.querySelector('.diaghint');
+  if (hint) hint.textContent = on ? '다시 탭하면 원래대로' : '탭하면 밸브 자리로 확대';
+  if (!on) { var i0 = w.querySelector('img'); if (i0) i0.style.width = ''; return; }
+  var f = (w.getAttribute('data-focus') || '').split(',').map(Number);
+  var img = w.querySelector('img');
+  if (f.length !== 4 || !img || !img.offsetWidth) return;
+  // 배율은 표시한 밸브들이 얼마나 흩어져 있느냐에 맞춘다.
+  // 밸브 4개가 도면 넓게 퍼져 있으면 크게 키워 봐야 아무것도 같이 안 보인다.
+  var z = Math.max(1.8, Math.min(4, 1 / Math.max(f[2], 0.06)));
+  img.style.width = (z * 100).toFixed(0) + '%';
+  // 밸브 묶음의 가운데를 화면 가운데로
+  w.scrollLeft = (f[0] + f[2] / 2) * img.offsetWidth - w.clientWidth / 2;
+  w.scrollTop = (f[1] + f[3] / 2) * img.offsetHeight - w.clientHeight / 2;
 }
 
 function swNoteHTML(e) {
