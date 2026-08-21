@@ -886,7 +886,15 @@ function partsHTML(e) {
   var b = '';
   if (pn.length) {
     // 많이 교체한 순 — 출동 전에 위에서부터 챙기면 된다 (파이프라인이 건수순 정렬)
-    b += '<h4>많이 교체한 순 — 출동 전 챙길 부품</h4><table class="pt"><tbody>' +
+    // 표본이 몇 건뿐이면 '통계' 가 아니라 '기록' 이다 — 그렇게 밝혀 적는다.
+    // TS-10·HISCL 은 부품이 청구된 방문 자체가 16~22건뿐이다 (현장 결정 2026-08).
+    var nv = c.pn_n || e.pn_n || 0;
+    b += '<h4>많이 교체한 순 — 출동 전 챙길 부품</h4>' +
+      (nv && nv < 3
+        ? '<div class="thin">방문 <b>' + nv + '건</b>의 기록입니다 — 통계가 아닙니다. ' +
+          '그때 한 번 그 부품을 썼다는 뜻으로만 보십시오.</div>'
+        : (nv ? '<div class="thin ok">방문 ' + nv + '건에서 집계했습니다.</div>' : '')) +
+      '<table class="pt"><tbody>' +
       pn.slice(0, 10).map(function (r, i) {
         return '<tr><td class="nm"><b class="rk">' + (i + 1) + '</b>' + esc(r.name) +
           (r.pn ? '<span class="pn' + (r.old ? ' old' : '') + '">' + esc(r.pn) + '</span>'

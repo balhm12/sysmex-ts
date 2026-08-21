@@ -60,11 +60,16 @@ header.compact #title .ko{font-size:19px}
 header .bar{display:flex;align-items:center;gap:8px;min-height:30px}
 header .bar .brand{flex:1;min-width:0}
 /* 홈 버튼 — 아이콘만으로는 안 보인다는 지적. 글씨를 같이 넣고 테두리를 준다 */
-.hbtn{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 11px;
-  border:1px solid rgba(255,255,255,.5);border-radius:9px;cursor:pointer;
-  background:rgba(255,255,255,.2);color:#fff;font-size:13px;font-weight:700}
-.hbtn:active{background:rgba(255,255,255,.34)}
-.hbtn .hi{font-size:15px;line-height:1}
+/* 장갑 낀 손으로도 눌리게 키웠다 (현장 지적 2026-08).
+   손가락 접촉면 권장 최소 44px 를 맞추고, 테두리를 굵게 해 눈에 먼저 걸리게 한다. */
+.hbtn{flex:none;display:flex;align-items:center;gap:6px;height:44px;padding:0 16px;
+  border:2px solid rgba(255,255,255,.85);border-radius:12px;cursor:pointer;
+  background:rgba(255,255,255,.28);color:#fff;font-size:16px;font-weight:800;
+  letter-spacing:-.2px;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.hbtn:active{background:rgba(255,255,255,.45);transform:translateY(1px)}
+.hbtn .hi{font-size:19px;line-height:1}
+/* 헤더가 접혀도 크기를 줄이지 않는다 — 접힌 뒤가 오히려 더 많이 쓰인다 */
+header.compact .hbtn{height:40px;padding:0 14px;font-size:15px}
 /* 스크롤해서 헤더가 접히면 홈 버튼만 남긴다 */
 header.compact .made{display:none}
 header .brand{min-width:0;flex:1}
@@ -492,3 +497,8 @@ table.spt td.sq{width:24%;white-space:normal}
 
 /* 단종 표시 — 현행 P/N 앞에 붙는다. 발주 전에 눈에 걸리게 한다. */
 .newpn.disc{color:#a33;font-weight:600}
+
+/* 부품 목록의 표본 크기 밝히기 — 방문 2건 이하면 '통계' 라고 읽히면 안 된다 */
+.thin{margin:6px 0 8px;padding:7px 10px;border-radius:8px;font-size:13px;
+      line-height:1.5;background:#fff5e6;border:1px solid #f0c98a;color:#7a4b00}
+.thin.ok{background:transparent;border:0;padding:0;color:#6b7280;font-size:12px}
