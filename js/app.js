@@ -877,6 +877,24 @@ function specialHTML(e) {
     b + '</div></details>';
 }
 
+function diagHTML(e) {
+  // Hydraulic Diagram 조각 — 그 Error 의 밸브를 표시한 원본 도면
+  if (!e || !e.diag || !e.diag.img) return '';
+  var d = e.diag;
+  return '<div class="card acc-card diagcard"><h3>Hydraulic Diagram ' +
+    '<span class="tag">S/M</span></h3>' +
+    '<div class="diagnote">' + esc(d.note || '') +
+    (d.valves && d.valves.length ? ' — <b>' + esc(d.valves.join(' · ')) + '</b>' : '') +
+    '</div><div class="diagwrap"><img src="img/diag/' + esc(d.img) +
+    '" alt="Hydraulic Diagram" loading="lazy"></div></div>';
+}
+
+function swNoteHTML(e) {
+  // PC·소프트웨어 계열은 조치 통계를 싣지 않는다 — 왜 비었는지 밝혀 적는다
+  if (!e || !e.swnote) return '';
+  return '<div class="swnote">' + e.swnote + '</div>';
+}
+
 function partsHTML(e) {
   // p1 은 e.crm 아래, p2(전체 에러)는 최상위에 있다 — 둘 다 읽는다
   var c = e.crm || {};
@@ -900,6 +918,7 @@ function partsHTML(e) {
           (r.pn ? '<span class="pn' + (r.old ? ' old' : '') + '">' + esc(r.pn) + '</span>'
                 : '<span class="pn no">P/N 미등록</span>') +
           // 같은 부품인데 더 최근에 쓴 P/N 이 따로 있으면 그쪽을 발주해야 한다
+          (r.sm ? '<span class="smpn">S/M 지정</span>' : '') +
           (r.disc ? '<span class="newpn disc">' + esc(r.disc) + ' 단종</span>' : '') +
           (r.old ? '<span class="newpn">현행 ' + esc(r.old) +
             (r.oldname ? ' · ' + esc(r.oldname) : '') + '</span>' : '') +
@@ -1179,7 +1198,7 @@ function renderError(dev, part, idx) {
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;
     view.innerHTML = head + specsHTML(e) + smHTML(e) + crmHTML(e) + specialHTML(e) + itemsHTML(e) +
-      notesHTML(e) + partsHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
+      swNoteHTML(e) + notesHTML(e) + partsHTML(e) + diagHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
       fbHTML(dev, e, part);
     var mb = $('#moreCases');
     if (mb) {
