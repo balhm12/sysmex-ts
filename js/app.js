@@ -36,6 +36,8 @@ function rich(t) {
   return esc(t)
     // esc() 가 따옴표까지 &quot; 로 바꾸므로 그 형태로 되돌린다
     .replace(/&lt;b class=&quot;ok&quot;&gt;/g, '<b class="ok">')
+    .replace(/&lt;b class=&quot;low&quot;&gt;/g, '<b class="low">')
+    .replace(/&lt;span class=&quot;procsec&quot;&gt;/g, '<span class="procsec">')
     .replace(/&lt;span class=&quot;dim&quot;&gt;/g, '<span class="dim">')
     .replace(/&lt;\/span&gt;/g, '</span>')
     .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
@@ -722,7 +724,20 @@ function smHTML(e) {
   var codes = (e.codes && e.codes.length) ? e.codes : (e.code ? [e.code] : []);
   if (codes.length) b += '<h4>Error Code</h4><p>' + esc(codes.join(' / ')) + '</p>';
   if (o.etype || o.elevel) {
-    b += '<h4>구분</h4><p>' + esc([o.etype, o.elevel].filter(Boolean).join(' · ')) + '</p>';
+    // 처리 방식·랙 동작도 매뉴얼 값이다. 칸을 새로 만들지 않고 이 줄에 얹는다.
+    b += '<h4>구분</h4><p>' +
+      esc([o.etype, o.elevel, o.tail].filter(Boolean).join(' · ')) + '</p>';
+  }
+  // 매뉴얼이 '무엇을 감시하다 이 에러를 냈는지' 적어 둔 것.
+  // 건수와 무관한 근거라 CRM 기록이 얇은 Error 일수록 값지다 —
+  // 어디부터 볼지 정하는 데 조치 통계보다 확실하다.
+  if (o.watch) {
+    b += '<h4>감시 부위 <span class="tag">S/M</span></h4><p>' + esc(o.watch) + '</p>';
+  }
+  // 언제 감시하다 이 에러를 냈는가 — 조치를 고르기 전에 **재현 조건**이 정해진다.
+  // 시작 시에만 뜨는 에러를 분석 중에 재현하려 애쓰는 일이 없어진다.
+  if (o.when) {
+    b += '<h4>검출 시점 <span class="tag">S/M</span></h4><p>' + esc(o.when) + '</p>';
   }
   if (m.meaning) b += '<h4>Meaning</h4><p>' + esc(m.meaning) + '</p>';
   // 점검 기준 블록이 같은 내용을 수치 위주로 이미 싣는다 — 두 번 쓰지 않는다
@@ -788,6 +803,10 @@ function crmHTML(e) {
   if (e.cause) b += '<p>' + rich(e.cause) + '</p>';
   // 근거가 얇은 카드는 조치 위에 먼저 밝힌다. 조치를 본 **뒤에** 알려 주면
   // 이미 그대로 하고 있다. 확실한 두 가지(S/M · 부품 P/N)로 보낸다.
+  // 현장이 직접 남긴 메모 — 집계에서 역산한 것이 아니라 사람이 적은 말이다.
+  if (e.fieldnote) {
+    b += '<div class="fieldnote"><b>현장 메모</b>' + esc(e.fieldnote) + '</div>';
+  }
   if (e.warn && e.warn.why && e.warn.why.length) {
     b += '<div class="softwarn"><b>이 조치 순서는 근거가 얇습니다</b>' +
       '<ul>' + e.warn.why.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') +

@@ -539,3 +539,23 @@ table.spt td.sq{width:24%;white-space:normal}
 .softwarn ul{margin:0 0 8px;padding-left:19px}
 .softwarn li{margin:3px 0}
 .softwarn span{display:block;color:#6b5520}
+
+/* 현장이 직접 남긴 메모 — 집계가 아니라 사람의 말이라 CRM 초록 계열로 둔다 */
+.fieldnote{margin:10px 0 12px;padding:11px 13px;border:1px solid #bfe0cd;
+  border-left:5px solid var(--crm);border-radius:10px;background:#f2faf5;
+  font-size:14.5px;line-height:1.62;color:#204a34}
+.fieldnote>b{display:block;margin-bottom:4px;font-size:13px;color:var(--crm)}
+
+/* 많이 하지만 잘 안 잡히는 조치 — 겁주지 않되 눈에는 걸리게.
+   자리는 작업 순서대로 두고(현장 합의) 사실만 덧붙인다. */
+.low{display:inline-block;margin-left:4px;padding:1px 7px;border-radius:6px;
+  background:#fdf0e3;border:1px solid #e8c9a2;color:#8a5410;
+  font-size:12px;font-weight:700;white-space:nowrap}
+
+
+
+/* 조치 → 매뉴얼 절 번호. 현장이 확인한 것만 붙는다.
+   S/M 계열(파랑)로 두어 현장 집계와 구분한다. */
+.procsec{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:6px;
+  background:#eef3fa;border:1px solid #cfdcee;color:var(--pri);
+  font-size:12px;font-weight:700;white-space:nowrap}
