@@ -23,6 +23,29 @@ var SW = null;                // Service Worker 등록 결과
 var view = $('#view'), qEl = $('#q'), qx = $('#qx'), backEl = $('#back'),
     homeEl = $('#home');
 var titleEl = $('#title'), subEl = $('#sub'), boot = $('#boot');
+var fabEl = $('#fab'), fabHomeEl = $('#fabHome');
+
+/* ── 떠 있는 단추 ────────────────────────────────────────
+   머리글은 위에 붙어 있지만, 긴 에러는 한참 내려가야 해서 다시 올라오는 것이
+   일이었다 (현장 지적 2026-08-25). 조금 내려가면 오른쪽 아래에 나타난다.
+   맨 위에서는 머리글에 같은 것이 이미 있으므로 감춰 둔다. */
+var FAB_AT = 220;              // 이만큼 내려가면 나타난다 (px)
+function fabSync() {
+  if (!fabEl) return;
+  var home = (location.hash === '' || location.hash === '#/' || location.hash === '#');
+  // 홈에서는 '홈' 단추가 갈 데가 없다 — 검색만 남긴다
+  if (fabHomeEl) fabHomeEl.hidden = home;
+  fabEl.hidden = (window.pageYOffset || document.documentElement.scrollTop || 0) < FAB_AT;
+}
+window.addEventListener('scroll', fabSync, { passive: true });
+window.addEventListener('resize', fabSync);
+if (fabEl) {
+  $('#fabSearch').addEventListener('click', function () {
+    window.scrollTo(0, 0);
+    qEl.focus();
+  });
+  fabHomeEl.addEventListener('click', function () { go(''); window.scrollTo(0, 0); });
+}
 
 /* ── 유틸 ─────────────────────────────────────────── */
 function esc(t) {
@@ -1366,6 +1389,7 @@ function go(hash) { location.hash = hash ? '#/' + hash : '#/'; }
 function route() {
   subEl.className = '';          // 홈에서 붙인 '문구' 서식을 되돌린다
   titleEl.className = '';        // 상세에서 붙인 '두 줄' 서식도 되돌린다
+  fabSync();
   var h = (location.hash || '#/').replace(/^#\/?/, '');
   var p = h.split('/').filter(Boolean).map(decodeURIComponent);
   if (!p.length) { qEl.value = ''; qx.hidden = true; return renderHome(); }

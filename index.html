@@ -38,6 +38,18 @@
 </header>
 
 <div id="banner" class="banner" hidden></div>
+
+<!-- 오른쪽 아래 떠 있는 단추 — 아무리 내려가도 홈·검색이 손에 닿게.
+     머리글은 붙어 있지만 긴 에러는 한참 내려가야 해서, 위로 다시 올라가는 것이
+     일이 됐다 (현장 지적 2026-08-25). 조금 내려가면 나타난다. -->
+<div id="fab" class="fab" hidden>
+  <button id="fabSearch" class="fbtn" aria-label="검색" title="검색">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+  </button>
+  <button id="fabHome" class="fbtn" aria-label="처음 화면으로" title="처음 화면으로">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 10.4L12 3.8l8.4 6.6"/><path d="M5.9 9.6V20h12.2V9.6"/></svg>
+  </button>
+</div>
 <main id="view" aria-live="polite"></main>
 
 <div id="boot" class="boot">
