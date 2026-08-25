@@ -233,34 +233,23 @@ var DEVCOLOR = {
 };
 function devColor(id) { return DEVCOLOR[id] || '#185adb'; }
 
-/* 재발률 등급. 55% 는 목록에서 이미 쓰던 기준이고, 30% 를 하나 더 뒀다.
+/* 재발률 등급 — 현장이 정한 기준 (2026-08-25).
+   20% 미만 낮음 · 20~40% 보통 · 40% 이상 높음.
    판정 건수가 얇으면(10건 미만) 애초에 r 이 안 온다 — 그때는 'na'. */
+var SEV_RULE = '20% 미만 낮음 · 20~40% 보통 · 40% 이상 높음';
 function sevOf(r) {
   if (r == null) return 'na';
-  if (r >= 55) return 'hi';
-  if (r >= 30) return 'mid';
+  if (r >= 40) return 'hi';
+  if (r >= 20) return 'mid';
   return '';
 }
-function sevText(r) {
+function sevWord(r) {
   var k = sevOf(r);
-  if (k === 'na') return '재발 자료 부족';
-  return '재발률 ' + r + '%  ' + (k === 'hi' ? '높음' : k === 'mid' ? '보통' : '낮음');
+  return k === 'hi' ? '높음' : k === 'mid' ? '보통' : k === 'na' ? '' : '낮음';
 }
-
-/* ── 최근 작업 ──────────────────────────────────────────
-   목록을 스쳐 지나간 것이 아니라 **상세를 연 것**만 쌓는다. 이 기기 안에만 남는다. */
-var REC2_KEY = 'ts-recent';
-function recent2() {
-  try { return JSON.parse(localStorage.getItem(REC2_KEY) || '[]') || []; }
-  catch (e) { return []; }
-}
-function pushRecent(d, part, idx, t) {
-  try {
-    var k = d + '/' + part + '/' + idx;
-    var a = recent2().filter(function (x) { return x && x.k !== k; });
-    a.unshift({ k: k, d: d, t: t });
-    localStorage.setItem(REC2_KEY, JSON.stringify(a.slice(0, 4)));
-  } catch (e) { /* 저장이 막혀도 화면은 그대로 간다 */ }
+function sevText(r) {
+  if (sevOf(r) === 'na') return '재발 자료 부족';
+  return '재발률 ' + r + '% ' + sevWord(r);
 }
 
 function rowHTML(r) {
@@ -326,20 +315,9 @@ function renderHome() {
     // p2 는 부품이 아니라 **전체 Error 수**다 — 목록 화면의 두 번째 탭과 같은 값이다.
     return '<button class="dev" data-dev="' + d.id + '" ' +
       'style="--dc:' + devColor(d.id) + '"><b>' + esc(d.name) + '</b>' +
-      '<i>Error <em>' + num(d.counts.p2) + '</em> · 주요 <em>' +
-      num(d.counts.p1) + '</em></i></button>';
+      '<i>Error <em>' + num(d.counts.p2) + '</em></i>' +
+      '<i>주요 Error <em>' + num(d.counts.p1) + '</em></i></button>';
   }).join('');
-
-  var r2 = recent2();
-  var rec2HTML = r2.length
-    ? '<div class="sec"><h2>최근 작업</h2><div class="rec2">' +
-      r2.map(function (x) {
-        return '<button class="rbtn" data-go="' + esc(x.k) + '" ' +
-          'style="--dc:' + devColor(x.d) + '">' +
-          '<span class="d">' + esc(x.d) + '</span>' +
-          '<span class="t">' + esc(x.t) + '</span></button>';
-      }).join('') + '</div></div>'
-    : '';
 
   var rec = recall();
   var recHTML = rec.length
@@ -364,13 +342,13 @@ function renderHome() {
     : '';
 
   view.innerHTML =
-    rec2HTML +
+    recHTML +                      // 최근 검색 — 검색창 바로 밑, 장비보다 위
     '<div class="sec"><h2>수리 (TS) — 장비를 고르십시오</h2>' +
     '<div class="devs">' + devs + '</div></div>' +
-    recHTML +
     '<div class="sec"><h2>자주 발생하는 Error</h2>' +
     '<div class="card rows">' + hot + '</div>' +
-    '<p class="muted">발생 건수 기준 상위입니다. 장비를 고르면 그 장비의 전체 목록이 나옵니다.</p></div>' +
+    '<p class="muted">발생 건수 기준 상위입니다. 장비를 고르면 그 장비의 전체 목록이 나옵니다.<br>' +
+    '재발률 등급 — ' + SEV_RULE + '</p></div>' +
     pmCard + offlineCardHTML() + noticeHTML();
 }
 
@@ -1301,30 +1279,29 @@ function renderError(dev, part, idx) {
     // 목록을 스쳐 지나간 것이 아니라 **상세를 연 것**만 센다.
     try { STAT.view(dev, e.en); } catch (ex) { /* 통계는 절대 화면을 막지 않는다 */ }
 
-    // 최근 작업 — 목록을 스친 것이 아니라 상세를 연 것만 쌓는다
-    pushRecent(dev, part, idx, e.en);
-
     var codes = (e.codes && e.codes.length) ? e.codes : (e.code ? [e.code] : []);
     var r = e.recur || {};
-    // 재발률은 이 화면에서 가장 값진 숫자다 — 같은 장비가 30일 안에 또 부른 비율.
-    // 판정 건수 10건 미만이면 흔들리므로 아예 내지 않는다 (PC 판과 같은 규칙).
+    // 이 화면에서 필요한 숫자는 둘뿐이다 — 얼마나 나는가, 다시 나는가.
+    // 재발률은 판정 건수 10건 미만이면 흔들리므로 아예 내지 않는다.
     var rp = (r.base >= 10) ? r.p30 : null;
     var sv = sevOf(rp);
-    var recurHTML = (rp == null) ? '' :
-      '<div class="recur ' + sv + '">' +
-      '<div class="lb"><i></i>' +
-      (sv === 'hi' ? '재발률 높음' : sv === 'mid' ? '재발률 보통' : '재발률 낮음') +
+    var factsHTML =
+      '<div class="facts ' + sv + '">' +
+      '<div class="fr">' +
+      '<div class="f"><span>발생 횟수</span><b>' + num(e.n) + '건</b></div>' +
+      '<div class="f"><span>재발률</span><b>' +
+      (rp == null ? '<em class="na">자료 부족</em>'
+                  : rp + '%<em>' + sevWord(rp) + '</em>') + '</b></div>' +
       '</div>' +
-      '<div class="v">' + rp + '<small>%</small></div>' +
-      '<div class="g"><i style="width:' + Math.max(2, Math.min(100, rp)) + '%"></i></div>' +
-      '<p class="cap">같은 장비를 <b>30일 안에 다시</b> 부른 비율입니다. ' +
-      '앞선 방문이 있어 간격을 잴 수 있는 ' + num(r.base) + '건으로 셌습니다.</p></div>';
-
-    var stats =
-      '<div class="stat"><b>' + num(e.n) + '건</b><span>발생</span></div>' +
-      (e.share != null ? '<div class="stat"><b>' + e.share + '%</b><span>이 장비 전체 중</span></div>' : '') +
-      ((e.crm || {}).base != null ?
-        '<div class="stat"><b>' + num(e.crm.base) + '건</b><span>조치 기록</span></div>' : '');
+      (rp == null ? '' :
+        '<div class="g"><i style="width:' + Math.max(2, Math.min(100, rp)) + '%"></i></div>') +
+      '<p class="cap">' +
+      (rp == null
+        ? '재발을 판정할 만큼 기록이 쌓이지 않았습니다.'
+        : '재발률은 같은 장비를 <b>30일 안에 다시</b> 부른 비율입니다 — ' +
+          '앞선 방문이 있어 간격을 잴 수 있는 ' + num(r.base) + '건으로 셌습니다.<br>' +
+          '<span class="rule">' + SEV_RULE + '</span>') +
+      '</p></div>';
 
     var head =
       '<div class="card head">' +
@@ -1339,11 +1316,10 @@ function renderError(dev, part, idx) {
       (part === '2' ? '<span class="tag p2">전체</span>' : '') + '</div>' +
       '<h1>' + esc(e.en) + '</h1>' +
       (e.ko ? '<p class="ko">' + esc(e.ko) + '</p>' : '') +
-      recurHTML +
-      '<div class="stats">' + stats + '</div>' +
+      factsHTML +
       bar(e.cause_share) +
-      ((e.steps && e.steps.length)
-        ? '<button class="cta" id="startTs">조치 순서 보기</button>' : '') +
+      // '조치 순서 보기' 버튼은 뺐다 — 바로 밑에 CRM Actual 이 펼쳐진 채로 있어
+      // 눌러도 같은 자리로 내려갈 뿐이었다 (현장 지적 2026-08-25).
       '</div>';
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;

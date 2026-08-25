@@ -152,44 +152,31 @@ main{padding:12px 12px 40px;max-width:820px;margin:0 auto}
 /* ── 장비 카드 ─────────────────────────────────────────
    장비마다 색을 다르게 준다. 면을 통째로 칠하면 글자가 묻히므로
    위쪽 4px 띠만 칠한다 — 색은 기억을 돕는 표시이지 배경이 아니다. */
-.devs{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.devs{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .dev{
   --dc:var(--pri);
   position:relative;overflow:hidden;
-  min-height:62px;display:flex;flex-direction:column;justify-content:center;
-  align-items:flex-start;gap:2px;
-  background:var(--card);border:1px solid var(--line);border-radius:12px;
-  padding:12px 12px 10px;cursor:pointer;text-align:left;color:var(--ink);
+  min-height:96px;display:flex;flex-direction:column;justify-content:center;
+  align-items:flex-start;gap:1px;
+  background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:16px 14px 14px;cursor:pointer;text-align:left;color:var(--ink);
   box-shadow:var(--sh);transition:transform .06s ease,box-shadow .06s ease
 }
 .dev::before{content:'';position:absolute;left:0;right:0;top:0;height:4px;
   background:var(--dc)}
-.dev b{font-size:16px;font-weight:800;letter-spacing:-.3px}
-.dev i{font-style:normal;font-size:11.5px;color:var(--mid);
-  font-variant-numeric:tabular-nums}
+.dev b{font-size:19px;font-weight:800;letter-spacing:-.4px;margin-bottom:6px}
+.dev i{display:block;font-style:normal;font-size:12.5px;color:var(--mid);
+  line-height:1.5;font-variant-numeric:tabular-nums}
 .dev i em{font-style:normal;font-weight:700;color:var(--ink)}
 .dev:active{transform:scale(.98);box-shadow:none}
 .dev.on{border-color:var(--dc);box-shadow:inset 0 0 0 1px var(--dc),var(--sh)}
 
-/* ── 최근 작업 — 검색 바로 밑, 장비보다 위 ─────────────
-   현장은 늘 같은 장비 한둘을 본다. 어제 보던 것을 두 번째 화면에서
-   찾게 하지 않는다. 상세를 연 것만 쌓는다(목록을 스친 것은 안 센다). */
-.rec2{display:flex;flex-direction:column;gap:8px}
-.rbtn{--dc:var(--pri);display:flex;align-items:center;gap:10px;width:100%;
-  text-align:left;background:var(--card);border:1px solid var(--line);
-  border-left:4px solid var(--dc);border-radius:11px;padding:11px 12px;
-  min-height:var(--tap);cursor:pointer;color:var(--ink);box-shadow:var(--sh)}
-.rbtn .t{flex:1;min-width:0;font-size:14px;font-weight:700;letter-spacing:-.25px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rbtn .d{flex:none;font-size:11px;font-weight:800;color:var(--dc);letter-spacing:.02em}
-.rbtn::after{content:'\203a';flex:none;color:var(--dim);font-size:18px;line-height:1}
-.rbtn:active{background:#f6f8fb}
 
 /* ── 목록 행 (검색 결과 · 에러 목록) ────────────────────── */
 .rows{overflow:hidden}
 .row{
   display:block;width:100%;text-align:left;background:none;border:0;
-  border-bottom:1px solid #eef1f4;padding:13px 34px 12px 14px;cursor:pointer;
+  border-bottom:1px solid #eef1f4;padding:17px 36px 16px 15px;cursor:pointer;
   min-height:var(--tap);color:inherit;position:relative;
 }
 /* 누를 수 있는 줄임을 보이게 — 현장에서 목록과 본문이 헷갈리지 않도록 */
@@ -200,21 +187,21 @@ main{padding:12px 12px 40px;max-width:820px;margin:0 auto}
 /* 1줄 제목 / 2줄 장비·코드 / 3줄 재발률·총건수.
    가장 많이 보는 것(제목·재발률)을 왼쪽에 둔다. */
 .r1{display:flex;align-items:center;gap:8px}
-.r1 .sev{flex:none;width:9px;height:9px;border-radius:50%;background:#94a3b8}
+.r1 .sev{flex:none;width:10px;height:10px;border-radius:50%;background:#94a3b8}
 .r1 .sev.mid{background:var(--warn)}
 .r1 .sev.hi{background:var(--hot)}
 .r1 .sev.na{background:#cbd5e1}
-.r1 .t{flex:1;min-width:0;font-weight:700;font-size:15px;letter-spacing:-.25px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.r3{display:flex;align-items:baseline;gap:8px;margin-top:6px}
-.r3 .rec{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:var(--mid);
+.r1 .t{flex:1;min-width:0;font-weight:800;font-size:17px;line-height:1.35;
+  letter-spacing:-.35px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r3{display:flex;align-items:baseline;gap:8px;margin-top:9px}
+.r3 .rec{flex:1;min-width:0;font-size:13.5px;font-weight:700;color:var(--mid);
   font-variant-numeric:tabular-nums}
 .r3 .rec.mid{color:var(--warn-i)}
 .r3 .rec.hi{color:var(--hot-i)}
 .r3 .rec.na{color:var(--dim);font-weight:600}
-.r3 .n{flex:none;font-size:12.5px;color:var(--mid);font-variant-numeric:tabular-nums}
-.r2{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
-.tag{font-size:11px;border-radius:5px;padding:1px 6px;white-space:nowrap}
+.r3 .n{flex:none;font-size:13.5px;color:var(--mid);font-variant-numeric:tabular-nums}
+.r2{display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap}
+.tag{font-size:11.5px;border-radius:5px;padding:2px 7px;white-space:nowrap}
 /* 장비 배지는 장비 색으로 — 테두리만. 코드 배지(채움)와 성격이 갈린다 */
 .tag.dv{background:#fff;color:var(--dc,var(--pri));font-weight:800;
   box-shadow:inset 0 0 0 1px currentColor}
@@ -233,33 +220,33 @@ main{padding:12px 12px 40px;max-width:820px;margin:0 auto}
 .head h1{margin:0;font-size:20px;line-height:1.32;letter-spacing:-.35px;font-weight:800}
 .head .ko{margin:4px 0 0;font-size:13px;color:var(--mid)}
 /* 수치는 한 덩어리로 묶어 제목과 구분한다 */
-/* 재발률 — 이 화면에서 가장 값진 숫자다. 하나만 크게 둔다.
-   나머지 수치는 밑에서 작게 받친다. */
-.recur{margin:13px 0 0;padding:13px 14px;border-radius:12px;
+/* 상세 수치 — 이 화면에서 필요한 숫자는 둘뿐이다.
+   얼마나 나는가(발생 횟수) · 다시 나는가(재발률). 등급 기준도 같이 적는다. */
+.facts{margin:13px 0 0;padding:14px 15px 13px;border-radius:12px;
   background:#f6f8fb;border:1px solid var(--line)}
-.recur.mid{background:var(--warn-w);border-color:#f6e2b8}
-.recur.hi{background:var(--hot-w);border-color:#f8ced0}
-.recur .lb{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;
-  letter-spacing:-.1px;color:var(--mid)}
-.recur.mid .lb{color:var(--warn-i)}
-.recur.hi .lb{color:var(--hot-i)}
-.recur .lb i{flex:none;width:9px;height:9px;border-radius:50%;background:currentColor}
-.recur .v{margin:3px 0 0;font-size:34px;font-weight:800;line-height:1.02;
-  letter-spacing:-1.4px;font-variant-numeric:tabular-nums;color:var(--ink)}
-.recur .v small{font-size:17px;font-weight:800;letter-spacing:-.4px;margin-left:1px}
-.recur .g{height:9px;border-radius:5px;background:rgba(23,32,51,.08);
-  overflow:hidden;margin:10px 0 0}
-.recur .g i{display:block;height:100%;border-radius:5px;background:#94a3b8}
-.recur.mid .g i{background:var(--warn)}
-.recur.hi .g i{background:var(--hot)}
-.recur .cap{margin:8px 0 0;font-size:11.5px;color:var(--mid);line-height:1.5}
-.stats{display:flex;gap:0;margin:11px 0 0;flex-wrap:wrap;
-  border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fbfcfe}
-.stat{flex:1;min-width:74px;padding:8px 10px;border-right:1px solid var(--line)}
-.stat:last-child{border-right:0}
-.stat b{display:block;font-size:15.5px;letter-spacing:-.3px;
-  font-variant-numeric:tabular-nums}
-.stat span{font-size:11px;color:var(--mid)}
+/* 20~40% 가 대다수다 — '보통'까지 면을 칠하면 경고가 흔해져 눈이 무뎌진다.
+   면을 칠하는 것은 '높음'뿐, '보통'은 글자와 막대로만 표시한다. */
+.facts.hi{background:var(--hot-w);border-color:#f8ced0}
+.facts .fr{display:flex;gap:12px}
+.facts .f{flex:1;min-width:0}
+.facts .f span{display:block;font-size:12px;font-weight:700;color:var(--mid);
+  letter-spacing:-.1px}
+.facts .f b{display:block;margin:3px 0 0;font-size:30px;font-weight:800;
+  line-height:1.1;letter-spacing:-1.1px;font-variant-numeric:tabular-nums;
+  color:var(--ink)}
+.facts .f b em{font-style:normal;font-size:13px;font-weight:800;
+  letter-spacing:-.2px;margin-left:6px;color:var(--mid);vertical-align:middle}
+.facts.mid .f b em{color:var(--warn-i)}
+.facts.hi .f b em{color:var(--hot-i)}
+.facts .f b em.na{font-size:17px;letter-spacing:-.4px;margin-left:0;
+  color:var(--dim);vertical-align:baseline}
+.facts .g{height:9px;border-radius:5px;background:rgba(23,32,51,.08);
+  overflow:hidden;margin:12px 0 0}
+.facts .g i{display:block;height:100%;border-radius:5px;background:#94a3b8}
+.facts.mid .g i{background:var(--warn)}
+.facts.hi .g i{background:var(--hot)}
+.facts .cap{margin:9px 0 0;font-size:11.5px;color:var(--mid);line-height:1.55}
+.facts .rule{display:inline-block;margin-top:3px;font-weight:700;color:var(--mid)}
 
 .share{margin:12px 0 0}
 .share .b{display:flex;align-items:center;gap:8px;margin-bottom:5px}
