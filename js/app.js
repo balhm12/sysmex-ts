@@ -989,7 +989,11 @@ function diagZoom(w) {
   if (f.length !== 4 || !img || !img.offsetWidth) return;
   // 배율은 표시한 밸브들이 얼마나 흩어져 있느냐에 맞춘다.
   // 밸브 4개가 도면 넓게 퍼져 있으면 크게 키워 봐야 아무것도 같이 안 보인다.
-  var z = Math.max(1.8, Math.min(4, 1 / Math.max(f[2], 0.06)));
+  //
+  // 위 한계를 4.0 → 2.2 로 내렸다 (현장 지적 2026-08-25).
+  // 4배로 키우면 밸브 하나만 화면을 채우고 **무엇에 이어져 있는지**가 잘려
+  // 나갔다. 2.2 배면 자른 창의 절반쯤이 보여 옆 배관과 부위 이름이 같이 든다.
+  var z = Math.max(1.4, Math.min(2.2, 0.5 / Math.max(f[2], 0.22)));
   img.style.width = (z * 100).toFixed(0) + '%';
   // 밸브 묶음의 가운데를 화면 가운데로
   w.scrollLeft = (f[0] + f[2] / 2) * img.offsetWidth - w.clientWidth / 2;
