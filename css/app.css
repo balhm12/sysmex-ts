@@ -11,6 +11,9 @@
   /* 상태색 — 바탕(-w)과 글자(-i)를 나눠 둔다. 노랑·빨강 원색은 글자로 못 쓴다 */
   --warn:#f59e0b; --warn-i:#92400e; --warn-w:#fff8ea;
   --hot:#e5484d;  --hot-i:#b42318;  --hot-w:#fef1f2;
+  /* 60% 이상 — 등급 나오는 90종 중 10종. 빨강 계열 안에서 한 단계 더 짙게
+     간다. 색을 새로 들이지 않는다 — 뜻이 같은 줄에 있어야 안 헷갈린다. */
+  --top:#9f1239;  --top-i:#881337;  --top-w:#fff1f4;
   --ok:#16a34a;   --ok-i:#15803d;   --ok-w:#edfcf2;
   --tap:44px;               /* 최소 터치 크기 */
   --hd:112px;               /* 헤더 높이 (JS 가 실측해 덮어쓴다) */
@@ -213,6 +216,7 @@ main{padding:12px 12px 84px;max-width:820px;margin:0 auto}
 .r1 .sev{flex:none;width:10px;height:10px;border-radius:50%;background:#94a3b8}
 .r1 .sev.mid{background:var(--warn)}
 .r1 .sev.hi{background:var(--hot)}
+.r1 .sev.top{background:var(--top)}
 .r1 .sev.na{background:#cbd5e1}
 .r1 .t{flex:1;min-width:0;font-weight:800;font-size:17px;line-height:1.35;
   letter-spacing:-.35px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -221,6 +225,7 @@ main{padding:12px 12px 84px;max-width:820px;margin:0 auto}
   font-variant-numeric:tabular-nums}
 .r3 .rec.mid{color:var(--warn-i)}
 .r3 .rec.hi{color:var(--hot-i)}
+.r3 .rec.top{color:var(--top-i);font-weight:800}
 .r3 .rec.na{color:var(--dim);font-weight:600}
 .r3 .n{flex:none;font-size:13.5px;color:var(--mid);font-variant-numeric:tabular-nums}
 .r2{display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap}
@@ -247,9 +252,10 @@ main{padding:12px 12px 84px;max-width:820px;margin:0 auto}
    얼마나 나는가(발생 횟수) · 다시 나는가(재발률). 등급 기준도 같이 적는다. */
 .facts{margin:13px 0 0;padding:14px 15px 13px;border-radius:12px;
   background:#f6f8fb;border:1px solid var(--line)}
-/* 20~40% 가 대다수다 — '보통'까지 면을 칠하면 경고가 흔해져 눈이 무뎌진다.
-   면을 칠하는 것은 '높음'뿐, '보통'은 글자와 막대로만 표시한다. */
+/* 30~50% 가 가장 많다 — '보통'까지 면을 칠하면 경고가 흔해져 눈이 무뎌진다.
+   면을 칠하는 것은 '높음'부터, '보통'은 글자와 막대로만 표시한다. */
 .facts.hi{background:var(--hot-w);border-color:#f8ced0}
+.facts.top{background:var(--top-w);border-color:#f3c2d1}
 .facts .fr{display:flex;gap:12px}
 .facts .f{flex:1;min-width:0}
 .facts .f span{display:block;font-size:12px;font-weight:700;color:var(--mid);
@@ -261,6 +267,7 @@ main{padding:12px 12px 84px;max-width:820px;margin:0 auto}
   letter-spacing:-.2px;margin-left:6px;color:var(--mid);vertical-align:middle}
 .facts.mid .f b em{color:var(--warn-i)}
 .facts.hi .f b em{color:var(--hot-i)}
+.facts.top .f b em{color:var(--top-i)}
 .facts .f b em.na{font-size:17px;letter-spacing:-.4px;margin-left:0;
   color:var(--dim);vertical-align:baseline}
 .facts .g{height:9px;border-radius:5px;background:rgba(23,32,51,.08);
@@ -268,6 +275,7 @@ main{padding:12px 12px 84px;max-width:820px;margin:0 auto}
 .facts .g i{display:block;height:100%;border-radius:5px;background:#94a3b8}
 .facts.mid .g i{background:var(--warn)}
 .facts.hi .g i{background:var(--hot)}
+.facts.top .g i{background:var(--top)}
 .facts .cap{margin:9px 0 0;font-size:11.5px;color:var(--mid);line-height:1.55}
 .facts .rule{display:inline-block;margin-top:3px;font-weight:700;color:var(--mid)}
 
