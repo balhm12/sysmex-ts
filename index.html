@@ -2,7 +2,11 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- maximum-scale=1 은 iOS 의 **자동 확대**(입력칸에 커서가 들어갈 때 화면을
+     통째로 키우는 것)를 막는다. 손가락으로 벌려 키우는 것은 iOS 10 이후
+     이 값을 무시하고 늘 되므로, 도면을 크게 보는 데는 지장이 없다.
+     글자 16px 만으로 안 잡히는 기기가 있어 함께 건다 (현장 2026-08-25). -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#1d4e89">
 <meta name="robots" content="noindex, nofollow, noarchive">
