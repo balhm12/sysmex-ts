@@ -1059,7 +1059,12 @@ function diagHTML(e) {
     (d.valves && d.valves.length ? ' — <b>' + esc(d.valves.join(' · ')) + '</b>' : '') +
     '</div><div class="diagwrap" data-focus="' +
     esc((d.focus || []).join(',')) + '" onclick="diagOpen(this)">' +
-    '<img src="img/diag/' + esc(d.img) + '" alt="Hydraulic Diagram" loading="lazy">' +
+    // 데이터가 옛 .jpg(폭 ≤1000px)를 가리켜도 같은 이름의 고해상도 .webp(폭 ~2600px)를 먼저 쓴다.
+    // .webp 가 없으면 onerror 로 원래 .jpg 로 되돌린다.
+    '<img src="img/diag/' + esc(d.img.replace(/\.jpe?g$/i, '.webp')) +
+    '" data-fb="img/diag/' + esc(d.img) +
+    '" onerror="if(this.dataset.fb&&this.getAttribute(\'src\')!==this.dataset.fb)this.src=this.dataset.fb" ' +
+    'alt="Hydraulic Diagram" loading="lazy">' +
     '<span class="diaghint">탭하면 전체 화면</span></div></div>';
 }
 
