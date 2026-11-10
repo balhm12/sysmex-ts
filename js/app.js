@@ -1373,7 +1373,7 @@ function relatedHTML(e, dev) {
   var co = e.co || [];
   if (!co.length) return '';
   var chips = co.map(function (x) {
-    return '<button class="chip" data-find="' + esc(x[0]) + '">' + esc(x[0]) +
+    return '<button class="chip" data-find="' + esc(x[0]) + '" data-fdev="' + esc(dev) + '">' + esc(x[0]) +
       '<i>' + x[1] + '</i></button>';
   }).join('');
   return '<details class="acc dat"><summary>Related Errors<span class="src">데이터</span>' +
@@ -1647,22 +1647,23 @@ function renderError(dev, part, idx) {
 }
 
 /* ── 화면 4: 검색 결과 ─────────────────────────────── */
-function renderSearch(q) {
+function renderSearch(q, dev) {
   titleEl.textContent = '검색';
-  subEl.textContent = '"' + q + '"';
+  subEl.textContent = '"' + q + '"' + (dev ? ' · ' + dev + ' 안에서' : '');
   backEl.hidden = false;
   homeEl.hidden = false;
   if (!INDEX) {
     view.innerHTML = '<div class="card"><div class="empty">검색 준비 중…</div></div>';
     ensureIndex().then(function () {
-      if (decodeURIComponent(location.hash).indexOf('#/q/' + q) === 0) renderSearch(q);
+      if (decodeURIComponent(location.hash).indexOf('#/q/' + q) === 0) renderSearch(q, dev);
     }).catch(fail);
     return;
   }
-  var rows = search(q, null, 60);
+  var rows = search(q, dev || null, 60);
   view.innerHTML =
     '<p class="muted" style="margin:0 0 8px">' + rows.length + '건' +
-    (rows.length >= 60 ? ' (상위 60건만 표시)' : '') + '</p>' +
+    (rows.length >= 60 ? ' (상위 60건만 표시)' : '') +
+    (dev ? ' · <button class="chip" data-q="' + esc(q) + '">전체 장비에서 찾기</button>' : '') + '</p>' +
     listHTML(rows, '결과가 없습니다. Error 이름 일부 · Code · Part No. · Valve 번호로 찾아보십시오.');
 }
 
@@ -1676,7 +1677,7 @@ function route() {
   var h = (location.hash || '#/').replace(/^#\/?/, '');
   var p = h.split('/').filter(Boolean).map(decodeURIComponent);
   if (!p.length) { qEl.value = ''; qx.hidden = true; return renderHome(); }
-  if (p[0] === 'q') { qEl.value = p[1] || ''; qx.hidden = !qEl.value; return renderSearch(p[1] || ''); }
+  if (p[0] === 'q') { qEl.value = p[1] || ''; qx.hidden = !qEl.value; return renderSearch(p[1] || '', p[2] || ''); }
   if (p[0] === 'd') return renderDevice(p[1], p[2]);
   if (p[0] === 'e') return renderError(p[1], p[2], p[3]);
   if (p[0] === 'pm') return renderPM();
@@ -1732,7 +1733,12 @@ document.addEventListener('click', function (ev) {
   if (t.dataset.dev) { go('d/' + t.dataset.dev); return; }
   if (t.dataset.tab) { go('d/' + location.hash.split('/')[2] + '/' + t.dataset.tab); return; }
   if (t.dataset.q) { qEl.value = t.dataset.q; go('q/' + encodeURIComponent(t.dataset.q)); return; }
-  if (t.dataset.find) { qEl.value = t.dataset.find; go('q/' + encodeURIComponent(t.dataset.find)); }
+  if (t.dataset.find) {
+    // 연관 Error 칩은 그 장비 안에서만 찾는다 — 다른 장비의 같은 이름 Error 가 섞여 보이던 것
+    qEl.value = t.dataset.find;
+    go('q/' + encodeURIComponent(t.dataset.find) +
+       (t.dataset.fdev ? '/' + encodeURIComponent(t.dataset.fdev) : ''));
+  }
 });
 
 document.addEventListener('click', function (ev) {
