@@ -691,10 +691,15 @@ var UPD_SHOWN = false;
 function updNotice() {
   if (UPD_SHOWN) return;
   UPD_SHOWN = true;
-  banner('앱이 새 버전으로 <b>업데이트</b>되었습니다.', function () {
+  // FS Portal 과 같은 알림 — 위쪽 가운데 파란 알약, 누르면 새로 열린다
+  var u = document.getElementById('updBar');
+  if (!u) return;
+  u.hidden = false;
+  u.onclick = function () {
+    u.textContent = '새로고침 중…';
     try { sessionStorage.setItem('ts-upd', '1'); } catch (e) {}
     location.reload();
-  }, '지금 적용');
+  };
 }
 
 function updDoneNotice() {
@@ -702,11 +707,13 @@ function updDoneNotice() {
     if (!sessionStorage.getItem('ts-upd')) return;
     sessionStorage.removeItem('ts-upd');
   } catch (e) { return; }
-  banner('✔ 업데이트가 적용되었습니다.');
-  setTimeout(function () {
-    var b = document.getElementById('banner');
-    if (b) b.hidden = true;
-  }, 4000);
+  var u = document.getElementById('updBar');
+  if (!u) return;
+  u.textContent = '✔ 업데이트가 적용되었습니다';
+  u.className = 'updbar done';
+  u.onclick = null;
+  u.hidden = false;
+  setTimeout(function () { u.hidden = true; }, 3500);
 }
 
 function initSW() {
