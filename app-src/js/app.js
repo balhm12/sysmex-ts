@@ -683,23 +683,55 @@ function precacheAll(btn) {
   SW.active.postMessage({ type: 'PRECACHE_ALL' });
 }
 
+/* 새 화면(껍데기)이 내려오면 **알린다**. 조용히 바뀌면 현장에서는 '고쳤다는데 그대로네'가 된다.
+   - 새 서비스워커가 설치되면 배너로 알리고, [지금 적용] 을 누르면 새로 열어 준다
+   - 새로 열린 직후 한 번 '적용되었습니다' 를 보여 준다 (sessionStorage — 탭이 닫히면 사라진다) */
+var UPD_SHOWN = false;
+
+function updNotice() {
+  if (UPD_SHOWN) return;
+  UPD_SHOWN = true;
+  banner('앱이 새 버전으로 <b>업데이트</b>되었습니다.', function () {
+    try { sessionStorage.setItem('ts-upd', '1'); } catch (e) {}
+    location.reload();
+  }, '지금 적용');
+}
+
+function updDoneNotice() {
+  try {
+    if (!sessionStorage.getItem('ts-upd')) return;
+    sessionStorage.removeItem('ts-upd');
+  } catch (e) { return; }
+  banner('✔ 업데이트가 적용되었습니다.');
+  setTimeout(function () {
+    var b = document.getElementById('banner');
+    if (b) b.hidden = true;
+  }, 4000);
+}
+
 function initSW() {
   if (!('serviceWorker' in navigator)) return;
+  updDoneNotice();
+  var hadCtl = !!navigator.serviceWorker.controller;   // 처음 설치와 '갱신' 을 가른다
   navigator.serviceWorker.register('sw.js').then(function (reg) {
     SW = reg;
     reg.addEventListener('updatefound', function () {
       var nw = reg.installing;
       if (!nw) return;
       nw.addEventListener('statechange', function () {
-        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-          banner('새 데이터가 있습니다.', function () {
-            nw.postMessage({ type: 'SKIP_WAITING' });
-            location.reload();
-          }, '받기');
-        }
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) updNotice();
       });
     });
+    // 앱을 오래 켜 둔 채 쓰는 일이 많다 — 다시 화면으로 돌아올 때마다 새 버전이 있는지 본다
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { try { reg.update(); } catch (e) {} }
+    });
   }).catch(function () { /* http:// 로컬 테스트 등 — 앱은 그대로 돈다 */ });
+
+  // 서비스워커는 설치하자마자 제어권을 가져간다(skipWaiting) — 이때도 알린다
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (hadCtl) updNotice();
+  });
 
   navigator.serviceWorker.addEventListener('message', function (ev) {
     var m = ev.data || {};
