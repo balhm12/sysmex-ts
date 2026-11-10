@@ -358,8 +358,8 @@ function renderHome() {
     // p2 는 부품이 아니라 **전체 Error 수**다 — 목록 화면의 두 번째 탭과 같은 값이다.
     return '<button class="dev" data-dev="' + d.id + '" ' +
       'style="--dc:' + devColor(d.id) + '"><b>' + esc(d.name) + '</b>' +
-      '<i>Error <em>' + num(d.counts.p2) + '</em></i>' +
-      '<i>주요 Error <em>' + num(d.counts.p1) + '</em></i></button>';
+      // 두 줄 → 한 줄: 카드 8개가 화면의 절반을 먹어 「자주 발생하는 Error」가 첫 화면 밖이었다
+      '<i>Error <em>' + num(d.counts.p2) + '</em> · 주요 <em>' + num(d.counts.p1) + '</em></i></button>';
   }).join('');
 
   var rec = recall();
