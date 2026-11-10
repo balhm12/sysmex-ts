@@ -1,6 +1,6 @@
 /* Sysmex TS Guide — Service Worker (build_mobile.py 가 생성한다. 직접 고치지 않는다) */
 var VERSION = 'enc-edc7e29d-20261111-fef8c461-e3e31a';
-var SHELL_VERSION = 'enc-edc7e29d-20261111-fef8c461-e3e31a-c820dac';
+var SHELL_VERSION = 'enc-edc7e29d-20261111-fef8c461-e3e31a-ce58bd1';
 var SHELL_CACHE = 'ts-shell-' + SHELL_VERSION;
 var DATA_CACHE = 'ts-data-' + VERSION;
 var SHELL = ["./", "./index.html", "./css/app.css", "./js/stat.js", "./js/app.js", "./manifest.webmanifest", "./fonts/brand.woff2", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png"];
@@ -11,7 +11,12 @@ self.addEventListener('install', function (e) {
   // 앱 껍데기 + 첫 화면 데이터만 먼저 받는다 (설치가 빨리 끝나도록)
   e.waitUntil(
     caches.open(SHELL_CACHE).then(function (c) {
-      return c.addAll(SHELL.concat(DATA.slice(0, 2)));
+      /* shell-fresh */ return Promise.all(SHELL.map(function (u) {
+        return fetch(new Request(u, { cache: 'reload' })).then(function (r) {
+          if (!r.ok) throw new Error(u + ' ' + r.status);
+          return c.put(u, r);
+        });
+      })).then(function () { return c.addAll(DATA.slice(0, 2)); });
     }).then(function () { return self.skipWaiting(); })
   );
 });
@@ -32,7 +37,7 @@ self.addEventListener('fetch', function (e) {
     caches.match(e.request).then(function (hit) {
       if (hit) {
         // 캐시로 먼저 응답하고, 온라인이면 조용히 갱신해 둔다
-        fetch(e.request).then(function (res) {
+        fetch(e.request, { cache: 'no-cache' }).then(function (res) {
           if (res && res.ok) {
             caches.open(res.url.indexOf('/data/') >= 0 ? DATA_CACHE : SHELL_CACHE)
               .then(function (c) { c.put(e.request, res.clone()); });

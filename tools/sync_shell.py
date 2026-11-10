@@ -54,6 +54,35 @@ def shell_list(sw):
     out = [r for r in out if r and not r.startswith(('icons/', 'fonts/'))]
     return out or FALLBACK
 
+SW_MARK = '/* shell-fresh */'
+SW_INSTALL_OLD = "return c.addAll(SHELL.concat(DATA.slice(0, 2)));"
+SW_INSTALL_NEW = (
+    "/* shell-fresh */ return Promise.all(SHELL.map(function (u) {\n"
+    "        return fetch(new Request(u, { cache: 'reload' })).then(function (r) {\n"
+    "          if (!r.ok) throw new Error(u + ' ' + r.status);\n"
+    "          return c.put(u, r);\n"
+    "        });\n"
+    "      })).then(function () { return c.addAll(DATA.slice(0, 2)); });")
+SW_BG_OLD = "        fetch(e.request).then(function (res) {"
+SW_BG_NEW = "        fetch(e.request, { cache: 'no-cache' }).then(function (res) {"
+
+
+def harden_sw(sw):
+    """서비스워커가 껍데기를 받을 때 브라우저의 임시 저장본(GitHub Pages 는 10분)을 쓰지 않게 한다.
+
+    왜: 새 껍데기를 설치하면서 방금 전까지 쓰던 옛 app.js 를 임시 저장본에서 집어 와
+        새 캐시에 넣으면, 서버는 새 것인데 휴대폰은 한참 옛 화면 그대로다.
+    sw.js 는 build_mobile.py 가 만들어 매번 덮어쓴다 — 그래서 여기서 **다시 넣는다**
+    (SHELL_VERSION 과 같은 방식). 두 번 돌려도 안전하다. 못 찾으면 경고만 하고 넘어간다.
+    """
+    if SW_MARK in sw:
+        return sw, False
+    if SW_INSTALL_OLD not in sw or SW_BG_OLD not in sw:
+        print('::warning::sw.js 의 install/fetch 모양이 달라 캐시 우회를 못 넣었습니다 — '
+              'build_mobile.py 의 sw.js 템플릿이 바뀌었는지 보십시오.')
+        return sw, False
+    return sw.replace(SW_INSTALL_OLD, SW_INSTALL_NEW, 1).replace(SW_BG_OLD, SW_BG_NEW, 1), True
+
 
 def copy_shell(root, files, check):
     moved, missing = [], []
@@ -95,6 +124,9 @@ def main():
     if not os.path.isdir(os.path.join(root, SRC)):
         sys.exit(SRC + '/ 폴더가 없습니다 — 껍데기의 단일 기준입니다. 먼저 올리십시오.')
     sw = io.open(swp, encoding='utf-8').read()
+    sw, hardened = harden_sw(sw)
+    if hardened:
+        print('sw.js 캐시 우회 ' + ('넣을 예정' if check else '넣음') + ' (껍데기를 받을 때 임시 저장본을 쓰지 않는다)')
     files = shell_list(sw)
 
     moved, missing = copy_shell(root, files, check)
@@ -116,6 +148,8 @@ def main():
     shc = RE_SHC.search(sw)
     if cur and cur.group(1) == newv and shc and shc.group(1) == 'SHELL_VERSION':
         print('SHELL_VERSION 이미 최신 — ' + newv)
+        if hardened and not check:
+            io.open(swp, 'w', encoding='utf-8', newline='\n').write(sw)
         return 0
     if check:
         print('SHELL_VERSION 바뀔 값 — ' + newv)
