@@ -1,0 +1,86 @@
+# 실마리 — 앱 화면 자동 배포 (1단계)
+#
+#   app-src/ 를 고친 PR 을 머지하면 → 여기부터 전부 자동 → Pages 배포
+#   선생님이 하실 일은 **머지뿐**입니다.
+#
+# 왜 공개 저장소에서 해도 되나
+#   앱 껍데기(index.html·app.js·stat.js·app.css·manifest)에는 거래처 실명이 없다.
+#   지금도 배포본에 평문으로 들어가 공개돼 있다 — 새로 나가는 것이 없다.
+#   CRM 원본도 비밀번호도 쓰지 않는다. 데이터(.enc 26MB)는 손대지 않는다.
+#
+# 데이터 갱신은 이 워크플로가 하지 않는다 (2단계 — 비공개 저장소 + Secret 필요).
+
+name: 앱 화면 배포
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app-src/**'
+      - 'tools/**'
+      - '.github/workflows/deploy-shell.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: silmari-shell
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 문법이 깨진 app.js 가 나가면 현장에서 앱이 안 열린다. 가장 먼저 본다.
+      - name: 문법 검사
+        run: |
+          set -euo pipefail
+          for f in app-src/js/*.js; do node --check "$f"; echo "OK  $f"; done
+
+      - name: 껍데기 점검 (기관 이름·전화번호·사람 이름·비밀번호)
+        run: python tools/gate_shell.py app-src
+
+      # app-src → 배포본 복사 + sw.js 껍데기 버전만 올리기.
+      # 대상 목록은 sw.js 의 SHELL 배열에서 읽는다 (손으로 적으면 파일이 늘 때 빠진다).
+      - name: 배포본에 반영
+        run: python tools/sync_shell.py .
+
+      - name: 바뀐 것 확인
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+            echo "배포본에 바뀐 것이 없습니다 — 커밋하지 않습니다."
+          else
+            echo "changed=yes" >> "$GITHUB_OUTPUT"
+            git --no-pager diff --stat
+          fi
+
+      - name: 커밋·푸시
+        if: steps.diff.outputs.changed == 'yes'
+        run: |
+          set -euo pipefail
+          git config user.name  'silmari-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m "화면 배포: ${{ github.event.head_commit.message || '수동 실행' }}"
+          git push
+
+      - name: 요약
+        run: |
+          {
+            echo '### 앱 화면 배포'
+            echo ''
+            echo "- 배포본 변경: ${{ steps.diff.outputs.changed }}"
+            echo "- \`$(grep -m1 'SHELL_VERSION = ' sw.js || grep -m1 'var VERSION' sw.js)\`"
+            echo ''
+            echo '휴대폰에서 앱을 다시 열면 새 화면이 내려갑니다. 데이터(26MB)는 다시 받지 않습니다.'
+          } >> "$GITHUB_STEP_SUMMARY"

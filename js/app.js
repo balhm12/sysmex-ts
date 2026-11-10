@@ -1006,6 +1006,17 @@ function specialHTML(e) {
     b + '</div></details>';
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Hydraulic Diagram — 전체 화면 뷰어 (현장 요청 2026-11-10)
+
+   바뀐 것: 카드 안에서 키우던 것을 **다른 창**으로 띄우고,
+   두 손가락으로 오므리고 펴서 확대·축소한다.
+
+   왜 카드 안이 아니라 다른 창인가
+     카드 안에서 키우면 세로 78vh 안에 갇혀 도면 한 줄도 다 안 보인다.
+     전체 화면이면 가로를 다 쓴다 — 밸브 둘 사이 배관을 한눈에 따라갈 수 있다.
+   ────────────────────────────────────────────────────────────────────────── */
+
 function diagHTML(e) {
   // Hydraulic Diagram 조각 — 그 Error 의 밸브를 표시한 원본 도면
   if (!e || !e.diag || !e.diag.img) return '';
@@ -1015,32 +1026,252 @@ function diagHTML(e) {
     '<div class="diagnote">' + esc(d.note || '') +
     (d.valves && d.valves.length ? ' — <b>' + esc(d.valves.join(' · ')) + '</b>' : '') +
     '</div><div class="diagwrap" data-focus="' +
-    esc((d.focus || []).join(',')) + '" onclick="diagZoom(this)">' +
+    esc((d.focus || []).join(',')) + '" onclick="diagOpen(this)">' +
     '<img src="img/diag/' + esc(d.img) + '" alt="Hydraulic Diagram" loading="lazy">' +
-    '<span class="diaghint">탭하면 밸브 자리로 확대</span></div></div>';
+    '<span class="diaghint">탭하면 전체 화면</span></div></div>';
 }
 
-function diagZoom(w) {
-  // 키울 때 왼쪽 위 구석을 보여 주면 대개 도면 제목이 나온다 — 쓸모가 없다.
-  // 표시한 밸브 자리(focus)를 화면 가운데로 옮긴다.
-  var on = w.classList.toggle('zoom');
-  var hint = w.querySelector('.diaghint');
-  if (hint) hint.textContent = on ? '다시 탭하면 원래대로' : '탭하면 밸브 자리로 확대';
-  if (!on) { var i0 = w.querySelector('img'); if (i0) i0.style.width = ''; return; }
+/* ── 뷰어 상태 ───────────────────────────────────────────────────────────── */
+var DV = null;
+
+function dvBuild() {
+  var el = document.createElement('div');
+  el.className = 'dv';
+  el.id = 'dv';
+  el.innerHTML =
+    '<div class="dvbar">' +
+      '<b class="dvt">S/M 도면</b><span class="dvv"></span>' +
+      '<button type="button" class="dvf">전체</button>' +
+      '<button type="button" class="dvx" aria-label="닫기">닫기</button>' +
+    '</div>' +
+    '<div class="dvstage"><img alt="Hydraulic Diagram" draggable="false"></div>' +
+    '<div class="dvtip">두 손가락으로 오므리고 펴서 확대·축소 · 두 번 탭하면 밸브 자리</div>';
+  document.body.appendChild(el);
+  var st = el.querySelector('.dvstage');
+  DV = { el: el, stage: st, img: el.querySelector('img'),
+         s: 1, x: 0, y: 0, min: 1, max: 6, bw: 0, bh: 0,
+         focus: null, pin: 0, moved: false, lastTap: 0, open: false };
+
+  el.querySelector('.dvx').addEventListener('click', function () { diagClose(); });
+  el.querySelector('.dvf').addEventListener('click', function () { dvToggle(); });
+
+  // 터치 — 한 손가락은 밀기, 두 손가락은 확대·축소
+  st.addEventListener('touchstart', dvTouch, { passive: false });
+  st.addEventListener('touchmove', dvTouch, { passive: false });
+  st.addEventListener('touchend', dvTouch, { passive: false });
+  st.addEventListener('touchcancel', dvTouch, { passive: false });
+
+  // iOS Safari 는 touch 를 막아도 제 나름의 확대 제스처를 또 보낸다 — 함께 막는다
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (n) {
+    st.addEventListener(n, function (ev) { ev.preventDefault(); });
+  });
+
+  // PC — 휠로 확대, 끌어서 밀기, 두 번 눌러 되돌리기
+  st.addEventListener('wheel', dvWheel, { passive: false });
+  st.addEventListener('mousedown', dvDown);
+  // 브라우저는 두 번 탭을 dblclick 으로도 한 번 더 보낸다 —
+  // 그대로 두면 dvTap 과 둘이 토글해 서로 되돌려 놓는다 (아무 일도 안 일어난 것처럼 보인다).
+  st.addEventListener('dblclick', function (ev) {
+    ev.preventDefault();
+    if (Date.now() - (DV.touchAt || 0) < 700) return;   // 손가락으로 한 것은 dvTap 이 이미 처리했다
+    dvToggle();
+  });
+
+  DV.img.addEventListener('load', function () { dvLayout(true); });
+  window.addEventListener('resize', function () { if (DV && DV.open) dvLayout(false); });
+  return DV;
+}
+
+function diagOpen(w) {
+  var im = w.querySelector('img');
+  if (!im || !im.getAttribute('src')) return;
+  if (!DV) dvBuild();
+
+  // 밸브 이름은 카드의 설명 줄에서 가져온다 (도면과 함께 떠 있어야 쓸모가 있다)
+  var card = w.parentNode, vb = card ? card.querySelector('.diagnote b') : null;
+  DV.el.querySelector('.dvv').textContent = vb ? vb.textContent : '';
+
   var f = (w.getAttribute('data-focus') || '').split(',').map(Number);
-  var img = w.querySelector('img');
-  if (f.length !== 4 || !img || !img.offsetWidth) return;
-  // 배율은 표시한 밸브들이 얼마나 흩어져 있느냐에 맞춘다.
-  // 밸브 4개가 도면 넓게 퍼져 있으면 크게 키워 봐야 아무것도 같이 안 보인다.
-  //
-  // 위 한계를 4.0 → 2.2 로 내렸다 (현장 지적 2026-08-25).
-  // 4배로 키우면 밸브 하나만 화면을 채우고 **무엇에 이어져 있는지**가 잘려
-  // 나갔다. 2.2 배면 자른 창의 절반쯤이 보여 옆 배관과 부위 이름이 같이 든다.
-  var z = Math.max(1.4, Math.min(2.2, 0.5 / Math.max(f[2], 0.22)));
-  img.style.width = (z * 100).toFixed(0) + '%';
-  // 밸브 묶음의 가운데를 화면 가운데로
-  w.scrollLeft = (f[0] + f[2] / 2) * img.offsetWidth - w.clientWidth / 2;
-  w.scrollTop = (f[1] + f[3] / 2) * img.offsetHeight - w.clientHeight / 2;
+  DV.focus = (f.length === 4 && f[2] > 0 && f[3] > 0) ? f : null;
+
+  var src = im.getAttribute('src');
+  DV.el.classList.add('on');
+  document.documentElement.classList.add('dvlock');
+  DV.open = true;
+  if (DV.img.getAttribute('src') === src && DV.img.complete) dvLayout(true);
+  else DV.img.setAttribute('src', src);
+
+  // 안드로이드 뒤로가기·스와이프로 닫히게 한다 (주소는 그대로 두어 라우터를 건드리지 않는다)
+  try { history.pushState({ dv: 1 }, '', location.href); } catch (err) {}
+}
+
+function diagClose(fromPop) {
+  if (!DV || !DV.open) return;
+  DV.open = false;
+  DV.el.classList.remove('on');
+  document.documentElement.classList.remove('dvlock');
+  if (!fromPop) { try { history.back(); } catch (err) {} }
+}
+
+window.addEventListener('popstate', function () { if (DV && DV.open) diagClose(true); });
+window.addEventListener('hashchange', function () { if (DV && DV.open) diagClose(true); });
+document.addEventListener('keydown', function (ev) {
+  if (!DV || !DV.open) return;
+  if (ev.key === 'Escape') diagClose();
+  if (ev.key === '0') { DV.s = DV.min; dvClamp(); dvApply(180); }
+});
+
+/* ── 자리 잡기 ───────────────────────────────────────────────────────────── */
+function dvLayout(reset) {
+  var st = DV.stage, im = DV.img;
+  var VW = st.clientWidth, VH = st.clientHeight;
+  var nw = im.naturalWidth || 1, nh = im.naturalHeight || 1;
+  // 배율 1 = 화면에 꼭 맞는 크기. 여기서부터 키운다.
+  var k = Math.min(VW / nw, VH / nh);
+  DV.bw = nw * k; DV.bh = nh * k;
+  im.style.width = DV.bw + 'px';
+  im.style.height = DV.bh + 'px';
+  DV.min = 1;
+  DV.max = Math.max(3, Math.min(10, (nw / Math.max(DV.bw, 1)) * 1.4));
+  // 글자가 읽히는 배율. 도면을 2600px 로 뽑는데 휴대폰 화면 폭은 390px 이라
+  // '화면에 꼭 맞게' 띄우면 밸브 번호가 한 글자도 안 읽힌다.
+  // 원본의 42% 쯤부터 읽히므로 그 아래로는 처음부터 띄우지 않는다.
+  DV.read = Math.min(DV.max, Math.max(1, (nw / Math.max(DV.bw, 1)) * 0.42));
+  // 원본 해상도. 이보다 키우면 그때부터는 뭉갠 그림이라 처음부터 그렇게 띄우지 않는다
+  // (손가락으로 더 키우는 것은 막지 않는다 — 가까이 보고 싶을 때가 있다).
+  DV.nat = Math.max(1, nw / Math.max(DV.bw, 1));
+  if (reset) dvFocus(true); else { dvClamp(); dvApply(0); }
+}
+
+function dvFocus(instant) {
+  // 처음 열 때는 표시한 밸브 자리를 가운데에 놓는다 —
+  // 왼쪽 위 구석을 보여 주면 대개 도면 제목이 나오고, 그건 쓸모가 없다.
+  var f = DV.focus, st = DV.stage;
+  var VW = st.clientWidth, VH = st.clientHeight, s = DV.min, cx = .5, cy = .5;
+  if (f) {
+    // 밸브 묶음이 화면의 90% 를 차지하게 — 둘레 배관이 같이 보여야 따라갈 수 있다
+    s = Math.min(VW / (f[2] * DV.bw), VH / (f[3] * DV.bh)) * 0.9;
+    cx = f[0] + f[2] / 2; cy = f[1] + f[3] / 2;
+  }
+  // 밸브 4개가 도면 양 끝에 흩어져 있으면 넷을 다 담으려다 글자가 안 읽히는 배율이 나온다.
+  // 그럴 때는 넷을 다 보여 주기를 포기하고 **읽히는 배율**을 택한다 — 미는 건 손가락으로 된다.
+  s = Math.max(s, DV.read || 1);
+  s = Math.min(s, DV.nat || DV.max);
+  DV.s = Math.max(DV.min, Math.min(DV.max, s));
+  DV.x = VW / 2 - cx * DV.bw * DV.s;
+  DV.y = VH / 2 - cy * DV.bh * DV.s;
+  dvClamp(); dvApply(instant ? 0 : 200); dvLabel();
+}
+
+function dvClamp() {
+  var st = DV.stage, VW = st.clientWidth, VH = st.clientHeight;
+  var w = DV.bw * DV.s, h = DV.bh * DV.s;
+  DV.x = w <= VW ? (VW - w) / 2 : Math.min(0, Math.max(VW - w, DV.x));
+  DV.y = h <= VH ? (VH - h) / 2 : Math.min(0, Math.max(VH - h, DV.y));
+}
+
+function dvApply(ms) {
+  DV.img.style.transition = ms ? 'transform ' + ms + 'ms ease' : 'none';
+  DV.img.style.transform =
+    'translate3d(' + DV.x.toFixed(1) + 'px,' + DV.y.toFixed(1) + 'px,0) scale(' + DV.s.toFixed(4) + ')';
+}
+
+function dvZoomAt(ns, mx, my) {
+  // 손가락(또는 마우스) 아래의 점이 제자리에 있도록 — 이게 없으면 확대할 때마다 딴 데로 튄다
+  ns = Math.max(DV.min, Math.min(DV.max, ns));
+  DV.x = mx - (mx - DV.x) * (ns / DV.s);
+  DV.y = my - (my - DV.y) * (ns / DV.s);
+  DV.s = ns;
+}
+
+function dvToggle() {
+  // 전체 보기 ↔ 밸브 자리. 두 번 탭해도, 위 버튼을 눌러도 같다.
+  if (DV.s > DV.min * 1.05) { DV.s = DV.min; dvClamp(); dvApply(200); }
+  else dvFocus(false);
+  dvLabel();
+}
+
+function dvLabel() {
+  var b = DV.el.querySelector('.dvf');
+  if (b) b.textContent = DV.s > DV.min * 1.05 ? '전체' : '밸브 자리';
+}
+
+/* ── 터치 ────────────────────────────────────────────────────────────────── */
+function dvDist(t) {
+  var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+function dvMid(t) {
+  return [(t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2];
+}
+
+function dvTouch(e) {
+  var t = e.touches, n = t.length, r;
+  if (e.type === 'touchstart') {
+    DV.moved = false;
+    if (n >= 2) {
+      DV.pin = dvDist(t); DV.ps = DV.s;
+      var m = dvMid(t); DV.pmx = m[0]; DV.pmy = m[1];
+    } else if (n === 1) { DV.pin = 0; DV.px = t[0].clientX; DV.py = t[0].clientY; }
+    return;
+  }
+  if (e.type === 'touchmove') {
+    e.preventDefault();              // 페이지가 같이 움직이면 도면을 못 민다
+    if (n >= 2 && DV.pin) {
+      var d = dvDist(t), m2 = dvMid(t);
+      r = DV.stage.getBoundingClientRect();
+      dvZoomAt(DV.ps * (d / DV.pin), m2[0] - r.left, m2[1] - r.top);
+      DV.x += m2[0] - DV.pmx; DV.y += m2[1] - DV.pmy;   // 두 손가락을 같이 옮기면 밀린다
+      DV.pmx = m2[0]; DV.pmy = m2[1];
+      DV.moved = true; dvClamp(); dvApply(0);
+    } else if (n === 1 && !DV.pin) {
+      var dx = t[0].clientX - DV.px, dy = t[0].clientY - DV.py;
+      DV.x += dx; DV.y += dy;
+      DV.px = t[0].clientX; DV.py = t[0].clientY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) DV.moved = true;   // 손 떨림은 탭으로 본다
+      dvClamp(); dvApply(0);
+    }
+    return;
+  }
+  // touchend · touchcancel
+  DV.touchAt = Date.now();
+  if (n === 0) {
+    if (!DV.moved && e.type === 'touchend') dvTap();
+    DV.pin = 0;
+  } else if (n === 1) {
+    // 두 손가락 중 하나를 떼면 남은 손가락으로 이어서 민다
+    DV.pin = 0; DV.px = t[0].clientX; DV.py = t[0].clientY;
+  }
+}
+
+function dvTap() {
+  var now = Date.now();
+  if (now - DV.lastTap < 300) { DV.lastTap = 0; dvToggle(); }
+  else DV.lastTap = now;
+}
+
+/* ── PC ──────────────────────────────────────────────────────────────────── */
+function dvWheel(e) {
+  e.preventDefault();
+  var r = DV.stage.getBoundingClientRect();
+  dvZoomAt(DV.s * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - r.left, e.clientY - r.top);
+  dvClamp(); dvApply(0);
+}
+
+function dvDown(e) {
+  e.preventDefault();
+  var sx = e.clientX, sy = e.clientY;
+  function mv(ev) {
+    DV.x += ev.clientX - sx; DV.y += ev.clientY - sy;
+    sx = ev.clientX; sy = ev.clientY;
+    dvClamp(); dvApply(0);
+  }
+  function up() {
+    document.removeEventListener('mousemove', mv);
+    document.removeEventListener('mouseup', up);
+  }
+  document.addEventListener('mousemove', mv);
+  document.addEventListener('mouseup', up);
 }
 
 function swNoteHTML(e) {

@@ -620,21 +620,14 @@ table.spt td.sq{width:24%;white-space:normal}
 
 /* Hydraulic Diagram 조각
    기본은 화면 폭에 맞춘다 — 처음부터 옆으로 밀어야 하면 있는 줄도 모른다.
-   탭하면 원래 크기로 커지고 그때부터 좌우로 민다 (현장 요청 2026-08-21). */
+   탭하면 전체 화면 뷰어로 연다 (현장 요청 2026-11-10). */
 .diagnote{margin:2px 0 9px;font-size:13px;line-height:1.55;color:#5b6472}
 .diagwrap{position:relative;overflow:hidden;border:1px solid #dfe4ec;
   border-radius:10px;background:#fff;cursor:zoom-in}
 .diagwrap img{display:block;width:100%;height:auto}
-.diagwrap.zoom{overflow:auto;-webkit-overflow-scrolling:touch;cursor:zoom-out}
-/* 원래 크기(width:auto)로 키우면 안 된다. 도면을 2600px 로 뽑으면서
-   휴대폰 화면에서는 7배가 되어 밸브 하나도 화면에 다 안 들어온다.
-   읽을 만한 배율(2.6배)로 못 박고, 남는 해상도는 선명함으로 쓴다. */
-.diagwrap.zoom img{width:260%;max-width:none}
-.diagwrap.zoom{max-height:78vh}
 .diaghint{position:absolute;right:8px;bottom:8px;padding:4px 9px;border-radius:7px;
   font-size:11px;font-weight:700;background:rgba(28,63,122,.86);color:#fff;
   pointer-events:none}
-.diagwrap.zoom .diaghint{position:sticky;left:8px;float:left}
 
 /* 근거가 얇은 카드 — 겁주지 않되 지나치지도 않게. 주의사항(회색)과 구분되는 호박색. */
 .softwarn{margin:10px 0 14px;padding:12px 14px;border:1px solid #e6c98a;
@@ -664,3 +657,60 @@ table.spt td.sq{width:24%;white-space:normal}
 .procsec{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:6px;
   background:#eef3fa;border:1px solid #cfdcee;color:var(--pri);
   font-size:12px;font-weight:700;white-space:nowrap}
+
+/* Hydraulic Diagram — 전체 화면 뷰어 (현장 요청 2026-11-10)
+   카드 안에서 키우던 방식(.diagwrap.zoom)은 세로 78vh 에 갇혀 도면 한 줄도 다 안 보였다.
+   카드 안의 조각은 이제 '열기 버튼' 이다 — 키우지 않는다. */
+.diagwrap { cursor: zoom-in; }
+
+.dv {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;   /* inset 은 구형 사파리에 없다 */
+  z-index: 90; display: none;
+  flex-direction: column; background: #0d1117;
+  /* 노치·홈바 피하기 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.dv.on { display: flex; }
+html.dvlock, html.dvlock body { overflow: hidden; overscroll-behavior: none; }
+
+.dvbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; color: #fff; flex: 0 0 auto;
+  background: #11161f; border-bottom: 1px solid #222b38;
+}
+.dvbar .dvt { flex: 0 0 auto; font-size: 13px; font-weight: 800;
+  letter-spacing: -.2px; white-space: nowrap; color: #b8c6da; }
+.dvbar .dvv {
+  flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; color: #ffd84d;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dvf {
+  flex: 0 0 auto; border: 1px solid #39465c; border-radius: 8px; padding: 6px 12px;
+  font-size: 12.5px; font-weight: 800; color: #dbe4f0; background: #1b2434;
+  font-family: inherit; cursor: pointer;
+}
+.dvx {
+  flex: 0 0 auto; border: 0; border-radius: 8px; padding: 7px 14px;
+  font-size: 13px; font-weight: 800; color: #0d1117; background: #fff;
+  font-family: inherit; cursor: pointer;
+}
+
+.dvstage {
+  flex: 1 1 auto; position: relative; overflow: hidden;
+  touch-action: none;              /* 브라우저 기본 확대·스크롤을 끈다 */
+  -webkit-user-select: none; user-select: none;
+  background: #0d1117;
+}
+.dvstage img {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  max-width: none; background: #fff;
+  -webkit-user-drag: none; user-select: none;
+}
+
+.dvtip {
+  flex: 0 0 auto; padding: 9px 12px calc(9px + env(safe-area-inset-bottom));
+  font-size: 11.5px; font-weight: 700; text-align: center;
+  color: #9fb0c8; background: #11161f; border-top: 1px solid #222b38;
+}
