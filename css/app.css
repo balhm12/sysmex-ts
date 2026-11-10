@@ -743,3 +743,15 @@ b,strong,h1,h2,h3,h4{letter-spacing:-.015em}
 input:focus,input:focus-visible{outline:0;border-color:var(--pri);box-shadow:0 0 0 3px rgba(0,91,172,.12)}
 h1,h2,h3{font-weight:700}
 .num,.n,.pc,.q,.rec{font-variant-numeric:tabular-nums}
+
+/* ── 새 버전 알림 — FS Portal 과 같은 알약 ─────────────────────── */
+.updbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));
+  z-index:58;background:#00457F;color:#fff;border:1px solid rgba(255,255,255,.55);border-radius:22px;padding:10px 18px;
+  min-height:44px;font-size:14px;box-shadow:0 6px 20px rgba(0,40,90,.35);white-space:nowrap;
+  max-width:calc(100vw - 24px);animation:updIn .3s ease-out;cursor:pointer}
+.updbar b{text-decoration:underline}
+.updbar.done{background:#15803d;cursor:default}
+.updbar.done b{text-decoration:none}
+@keyframes updIn{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (display-mode:standalone){.updbar{top:calc(34px + env(safe-area-inset-top))}}
+@media (prefers-reduced-motion:reduce){.updbar{animation:none}}
