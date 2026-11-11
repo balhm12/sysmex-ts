@@ -1816,7 +1816,17 @@ function renderSearch(q, dev) {
 /* ── 라우팅 ───────────────────────────────────────── */
 function go(hash) { location.hash = hash ? '#/' + hash : '#/'; }
 
+/* 지금 보고 있는 장비 — 장비 화면(#/d/XN)이나 그 장비 안의 검색 결과(#/q/검색어/XN)면 그 장비 */
+var PH_DEFAULT = qEl.getAttribute('placeholder') || '';
+function curDev() {
+  var p = (location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+  if (p[0] === 'd' && p[1] && devOf(p[1])) return p[1];
+  if (p[0] === 'q' && p[2] && devOf(p[2])) return p[2];
+  return '';
+}
 function route() {
+  var cd = curDev();
+  qEl.setAttribute('placeholder', cd ? cd + ' 안에서 Error·코드·증상 찾기' : PH_DEFAULT);
   subEl.className = '';          // 홈에서 붙인 '문구' 서식을 되돌린다
   titleEl.className = '';        // 상세에서 붙인 '두 줄' 서식도 되돌린다
   fabSync();
@@ -1841,12 +1851,12 @@ qEl.addEventListener('input', function () {
   qx.hidden = !qEl.value;
   clearTimeout(tmr);
   tmr = setTimeout(function () {
-    var v = qEl.value.trim();
-    if (!v) { if (location.hash.indexOf('#/q/') === 0) go(''); return; }
-    var target = '#/q/' + encodeURIComponent(v);
+    var v = qEl.value.trim(), cd = curDev();
+    if (!v) { if (location.hash.indexOf('#/q/') === 0) go(cd ? 'd/' + cd : ''); return; }
+    var target = '#/q/' + encodeURIComponent(v) + (cd ? '/' + encodeURIComponent(cd) : '');
     if (location.hash.indexOf('#/q/') === 0) {
       history.replaceState(null, '', target);       // 타이핑 중에는 히스토리를 쌓지 않는다
-      renderSearch(v);
+      renderSearch(v, cd);
     } else {
       location.hash = target;
     }
@@ -1856,7 +1866,7 @@ qEl.addEventListener('change', function () { remember(qEl.value.trim()); });
 qEl.addEventListener('keydown', function (ev) {
   if (ev.key === 'Enter') { remember(qEl.value.trim()); qEl.blur(); }
 });
-qx.addEventListener('click', function () { qEl.value = ''; qx.hidden = true; qEl.focus(); go(''); });
+qx.addEventListener('click', function () { var cd = curDev(); qEl.value = ''; qx.hidden = true; qEl.focus(); go(cd ? 'd/' + cd : ''); });
 backEl.addEventListener('click', function () {
   if (history.length > 1) history.back(); else go('');
 });
