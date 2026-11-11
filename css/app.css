@@ -755,3 +755,15 @@ h1,h2,h3{font-weight:700}
 @keyframes updIn{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
 @media (display-mode:standalone){.updbar{top:calc(34px + env(safe-area-inset-top))}}
 @media (prefers-reduced-motion:reduce){.updbar{animation:none}}
+
+/* ── 로딩 화면 — FS Portal 과 같은 구성: 앱 아이콘 + 이름 + 하늘색 물결 막대 + 「연결 중…」 ── */
+.boot .splbox{text-align:center;color:var(--mid)}
+.boot .spllogo{display:block;width:72px;height:72px;border-radius:20px;margin:0 auto 12px;
+  object-fit:contain;box-shadow:0 2px 6px rgba(16,24,40,.07),0 1px 2px rgba(16,24,40,.05)}
+.boot .splname{font-size:20px;font-weight:700;color:var(--ink);margin-bottom:18px}
+.boot .splwave{width:150px;height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:2px auto 12px}
+.boot .splwave svg{display:block;width:300px;height:10px;animation:splwv 1.4s linear infinite}
+.boot .splwave path{fill:#00B8EE}
+@keyframes splwv{to{transform:translateX(-80px)}}
+.boot #bootmsg{font-size:13px;margin:0}
+@media (prefers-reduced-motion:reduce){.boot .splwave svg{animation:none}}
