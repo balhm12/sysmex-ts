@@ -1009,7 +1009,7 @@ function crmHTML(e) {
   b += '<h4>현장 조치 <span class="dim">(작업 기록 ' + num(c.base || 0) + '건 집계)</span></h4>' +
     (hasSteps ? '<div class="ckbar"><span id="ckn"></span>' +
       '<button type="button" class="ckreset" id="ckReset" hidden>처음부터</button></div>' : '') +
-    stagesHTML(e.steps) +
+    stagesHTML(e.steps) + (hasSteps ? solveHTML() : '') +
     // 숫자의 뜻은 접어 둔다 — 현장에서는 조치가 먼저이고, 설명은 궁금할 때만
     '<details class="lg"><summary>숫자 보는 법</summary>' +
     '<p>앞의 <b>N건</b>은 그 조치를 한 횟수입니다. <b>양호로 끝남 N/M</b>은 그 조치를 한 방문 M건 중 ' +
@@ -1027,6 +1027,39 @@ function crmHTML(e) {
   return '<details class="acc crm" open><summary>현장 조치 · CRM Actual<span class="src">현장</span>' +
     '</summary><div class="body">' + b + '</div></details>';
 }
+/* 조치 결과 의견 — 이 Error 를 다시 만났을 때 어떤 조치가 실제로 통했는지 쌓는다.
+   기기 안에는 마지막 답만 저장(ts-fbv), 보내는 것은 장비·Error 이름·답 하나뿐이다(익명, js/stat.js). */
+var FB_STORE = 'ts-fbv', FB_CTX = null;
+var FB_OPTS = [['y', '이 조치대로'], ['o', '다른 조치'], ['n', '해결 안 됨']];
+function fbLoad() { try { return JSON.parse(localStorage.getItem(FB_STORE) || '{}') || {}; } catch (e) { return {}; } }
+function solveHTML() {
+  var cur = (FB_CTX && fbLoad()[CK_KEY]) || '';
+  return '<div class="solve" id="solve"><div class="sq">이 Error는 어떻게 해결됐나요?</div>' +
+    '<div class="sb" role="group" aria-label="해결 결과">' +
+    FB_OPTS.map(function (o) {
+      return '<button type="button" class="sbtn' + (cur === o[0] ? ' on' : '') + '" data-fb="' + o[0] +
+        '" aria-pressed="' + (cur === o[0] ? 'true' : 'false') + '">' + o[1] + '</button>';
+    }).join('') + '</div>' +
+    '<div class="sn" id="solveNote">' + (cur ? '의견 고맙습니다. 다음 갱신에 반영됩니다.' :
+      '누른 결과는 장비·Error 이름과 함께 익명으로 집계됩니다.') + '</div></div>';
+}
+function solveSet(res) {
+  if (!FB_CTX || !CK_KEY) return;
+  var o = fbLoad(), prev = o[CK_KEY] || '';
+  if (prev === res) return;
+  delete o[CK_KEY]; o[CK_KEY] = res;
+  var ks = Object.keys(o);
+  if (ks.length > 80) ks.slice(0, ks.length - 80).forEach(function (k) { delete o[k]; });
+  try { localStorage.setItem(FB_STORE, JSON.stringify(o)); } catch (e) { /* 무시 */ }
+  try { STAT.fb(FB_CTX.dev, FB_CTX.en, res); } catch (ex) { /* 통계는 화면을 막지 않는다 */ }
+  document.querySelectorAll('#solve .sbtn').forEach(function (b) {
+    var on = b.dataset.fb === res;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  var n = document.getElementById('solveNote');
+  if (n) n.textContent = '의견 고맙습니다. 다음 갱신에 반영됩니다.';
+}
+
 /* 출동 전 챙길 부품 — 접힌 Related Parts 를 열지 않아도 상위 3개가 조치 바로 밑에 보인다 */
 function quickPartsHTML(e) {
   var c = e.crm || {};
@@ -1778,6 +1811,7 @@ function renderError(dev, part, idx) {
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;
     CK_KEY = dev + '|' + key + '|' + idx;
+    FB_CTX = { dev: dev, en: e.en };
     view.innerHTML = head + crmHTML(e) + quickPartsHTML(e) + specsHTML(e) + smHTML(e) + specialHTML(e) + itemsHTML(e) +
       swNoteHTML(e) + notesHTML(e) + partsHTML(e) + diagHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
       fbHTML(dev, e, part);
@@ -1923,6 +1957,8 @@ document.addEventListener('click', function (ev) {
     var x = document.getElementById('qfx'), open = x.hidden;
     x.hidden = !open; ev.target.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
+  var fbb = ev.target.closest && ev.target.closest('[data-fb]');
+  if (fbb) solveSet(fbb.dataset.fb);
   if (id === 'ckReset') {
     document.querySelectorAll('.stage .chk input').forEach(function (b) {
       b.checked = false; b.closest('.chk').classList.remove('done');
