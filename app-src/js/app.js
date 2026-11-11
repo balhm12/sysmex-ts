@@ -335,6 +335,7 @@ function noticeHTML() {
     '두 내용이 다르면 정식 문서가 우선합니다.</p>' +
     // 데이터 버전은 바로 위 오프라인 카드에 이미 있다 — 여기서 또 적지 않는다
     '<p class="dim">거래처명은 모두 가렸습니다 · 사내 전용</p>' +
+    '<p><button class="obtn" id="openGuide">사용 안내 보기</button></p>' +
     // 세고 있다는 사실은 화면에 밝힌다. 몰래 세면 도구를 안 믿게 된다.
     (STAT && STAT.on() ?
       '<p class="dim">어느 Error 를 많이 찾는지 <b>익명으로만</b> 셉니다 — ' +
@@ -343,6 +344,43 @@ function noticeHTML() {
     '</div></div>';
 }
 
+
+/* ── 처음 사용 안내 (FS Portal 의 「1분 둘러보기」와 같은 구성) ─────────
+   처음 연 기기에 한 번 보여 주고(localStorage 'ts-guide'), 홈 맨 아래 「사용 안내」로 다시 본다. */
+var GUIDE_KEY = 'ts-guide';
+var GUIDE_STEPS = [
+  ['🔎', '먼저 검색하세요', '맨 위 검색창에 에러 이름·오류 코드·증상·부품 번호(P/N)를 넣으면 장비와 상관없이 바로 찾아 줍니다.'],
+  ['🧰', '장비 → Error 고르기', '홈에서 장비를 누르면 「주요 Error」와 「전체 Error」 목록이 나옵니다. 재발률 색(낮음·보통·높음)과 발생 건수를 보고 고르세요.'],
+  ['✅', '조치는 체크하며', 'Error 를 열면 현장에서 실제로 한 조치가 순서대로 나옵니다. 하나씩 눌러 체크하며 진행하고, 교체는 마지막에 합니다.'],
+  ['🧩', '부품·도면', '「Related Parts」에서 출동 전에 챙길 부품(P/N)을, 「Hydraulic Diagram」에서 밸브 위치를 봅니다. 도면은 눌러서 확대합니다.'],
+  ['📲', '홈 화면에 추가', '아이폰은 공유 → 홈 화면에 추가, 안드로이드는 메뉴 → 앱 설치. 한 번 열어 두면 새 버전이 나올 때 위쪽에 알려 줍니다.']
+];
+function guideSeen() { try { return localStorage.getItem(GUIDE_KEY); } catch (e) { return '1'; } }
+function openGuide(first) {
+  if (document.getElementById('gdOv')) return;
+  var ov = document.createElement('div');
+  ov.className = 'gdov'; ov.id = 'gdOv';
+  ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-labelledby', 'gdT');
+  ov.innerHTML =
+    '<div class="gdcard"><h2 id="gdT">' + (first ? '실마리 1분 둘러보기' : '사용 안내') + '</h2>' +
+    '<p class="gdsub">막혔을 때 장비·Error 를 찾아 조치와 부품까지 보는 현장 가이드입니다.</p>' +
+    '<div class="gdl">' + GUIDE_STEPS.map(function (x, i) {
+      return '<div class="gdi"><span class="gdic" aria-hidden="true">' + (i + 1) + '</span>' +
+        '<div><b>' + esc(x[1]) + '</b><p>' + esc(x[2]) + '</p></div></div>';
+    }).join('') + '</div>' +
+    '<button class="gdok" id="gdOk">시작하기</button></div>';
+  document.body.appendChild(ov);
+  var done = function () {
+    try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) {}
+    ov.remove();
+  };
+  var ok = document.getElementById('gdOk');
+  ok.onclick = done;
+  ov.addEventListener('click', function (ev) { if (ev.target === ov) done(); });
+  ov.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') done(); });
+  ok.focus();
+}
 
 function renderHome() {
   titleEl.innerHTML = '<span class="ko">실마리</span><span class="en">Sysmex TS Guide</span>';
@@ -1755,6 +1793,7 @@ document.addEventListener('click', function (ev) {
 
 document.addEventListener('click', function (ev) {
   if (ev.target.id === 'saveAll') precacheAll(ev.target);
+  if (ev.target.id === 'openGuide') openGuide(false);
   if (ev.target.closest('[data-go-pm]')) go('pm');
   if (ev.target.id === 'pmPdf') pmPdf();
   if (ev.target.id === 'pmCsv') pmCsv();
@@ -1843,6 +1882,8 @@ function start() {
       idle(function () { ensureIndex(); initSW(); });   // 검색 인덱스·오프라인 준비는 뒤이어
       // 잠금을 푼 뒤에만 센다 — 비밀번호를 모르는 접근은 사용이 아니다
       try { STAT.open(META.v); } catch (ex) { /* 무시 */ }
+      // 처음 연 기기에는 사용 안내를 한 번 보여 준다
+      if (!guideSeen()) setTimeout(function () { openGuide(true); }, 300);
     })
     .catch(function (err) {
       if (AUTH) {                               // 키가 상했을 수 있다 — 다시 묻는다
