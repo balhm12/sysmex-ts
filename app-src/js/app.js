@@ -1913,6 +1913,7 @@ function start() {
       return new Promise(function (ok) { setTimeout(ok, wait); });
     })
     .then(function () {
+      try { sessionStorage.removeItem('ts-heal'); } catch (e) { /* 무시 */ }
       if (boot.parentNode) boot.remove();
       route();                                  // 홈은 여기서 이미 보인다
       var idle = window.requestIdleCallback ||
@@ -1926,7 +1927,21 @@ function start() {
     .catch(function (err) {
       if (AUTH) {                               // 키가 상했을 수 있다 — 다시 묻는다
         forgetKey(); KEY = null;
-        askPassword('데이터를 열지 못했습니다. 비밀번호를 다시 넣어 주십시오.');
+        // 데이터를 새로 만든 직후, 이 기기 저장본에 예전 판과 새 판 파일이 섞이면
+        // 비밀번호 확인(_auth.json)은 통과해도 데이터가 열리지 않는다. 같은 화면에서
+        // 다시 넣어도 처음 읽은 _auth.json 을 계속 쓰므로, 저장본을 지우고 한 번만 새로 연다.
+        var healed = false;
+        try { healed = sessionStorage.getItem('ts-heal') === '1'; } catch (e) { healed = true; }
+        if (!healed && window.caches && caches.keys) {
+          try { sessionStorage.setItem('ts-heal', '1'); } catch (e) { /* 무시 */ }
+          caches.keys().then(function (ks) {
+            return Promise.all(ks.filter(function (k) { return /^ts-/.test(k); })
+              .map(function (k) { return caches.delete(k); }));
+          }).catch(function () {}).then(function () { location.reload(); });
+          return;
+        }
+        askPassword(healed ? '최신 데이터를 다시 받았습니다. 비밀번호를 한 번 더 넣어 주십시오.'
+                           : '데이터를 열지 못했습니다. 비밀번호를 다시 넣어 주십시오.');
         return;
       }
       if (boot.parentNode) {
