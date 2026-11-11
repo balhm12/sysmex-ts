@@ -819,3 +819,9 @@ details.lg p{margin:0 0 4px;font-size:12.5px;line-height:1.6;color:var(--mid)}
 .qr .q{flex:none;font-size:12.5px;color:var(--mid)}
 .qall{display:block;width:100%;min-height:44px;margin-top:4px;border:1px solid var(--line);
   border-radius:10px;background:#fff;font:inherit;font-size:13.5px;font-weight:600;color:var(--pri)}
+
+/* 목록의 긴 Error 이름은 두 줄까지 보인다 — 뒤가 잘리면 뜻을 잃는다 (상세 화면과 같은 이유) */
+.r1 .t{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;text-overflow:clip;font-size:16.5px;line-height:1.35}
+.r1{align-items:flex-start}
+.r1 .sev{margin-top:7px}
