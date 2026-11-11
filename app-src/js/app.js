@@ -349,37 +349,75 @@ function noticeHTML() {
    처음 연 기기에 한 번 보여 주고(localStorage 'ts-guide'), 홈 맨 아래 「사용 안내」로 다시 본다. */
 var GUIDE_KEY = 'ts-guide';
 var GUIDE_STEPS = [
-  ['🔎', '먼저 검색하세요', '맨 위 검색창에 에러 이름·오류 코드·증상·부품 번호(P/N)를 넣으면 장비와 상관없이 바로 찾아 줍니다.'],
-  ['🧰', '장비 → Error 고르기', '홈에서 장비를 누르면 「주요 Error」와 「전체 Error」 목록이 나옵니다. 재발률 색(낮음·보통·높음)과 발생 건수를 보고 고르세요.'],
-  ['✅', '조치는 체크하며', 'Error 를 열면 현장에서 실제로 한 조치가 순서대로 나옵니다. 하나씩 눌러 체크하며 진행하고, 교체는 마지막에 합니다.'],
-  ['🧩', '부품·도면', '「Related Parts」에서 출동 전에 챙길 부품(P/N)을, 「Hydraulic Diagram」에서 밸브 위치를 봅니다. 도면은 눌러서 확대합니다.'],
-  ['📲', '홈 화면에 추가', '아이폰은 공유 → 홈 화면에 추가, 안드로이드는 메뉴 → 앱 설치. 한 번 열어 두면 새 버전이 나올 때 위쪽에 알려 줍니다.']
+  { sel: '#q', t: '먼저 검색하세요', d: '에러 이름·오류 코드·증상·부품 번호(P/N)를 넣으면 장비와 상관없이 바로 찾아 줍니다.' },
+  { sel: '.devs', t: '장비 → Error 고르기', d: '장비를 누르면 「주요 Error」와 「전체 Error」 목록이 나옵니다. 재발률 색과 발생 건수를 보고 고르세요.' },
+  { sel: '.rows', t: 'Error 를 열면 조치가 순서대로', d: '현장에서 실제로 한 조치가 순서대로 나옵니다. 하나씩 눌러 체크하며 진행하고, 교체는 마지막에 합니다. 아래쪽에 부품(P/N)과 밸브 도면이 있습니다.' },
+  { sel: '.pmsec', t: 'PM 후 확인 체크리스트', d: '정기 점검 직후에 확인할 곳을 체크하고 PDF·엑셀로 내보냅니다. 수리(TS)와는 별개 업무입니다.' },
+  { sel: null, t: '홈 화면에 추가', d: '아이폰은 공유 → 홈 화면에 추가, 안드로이드는 메뉴 → 앱 설치. 한 번 열어 두면 새 버전이 나올 때 위쪽에 알려 줍니다.' }
 ];
 function guideSeen() { try { return localStorage.getItem(GUIDE_KEY); } catch (e) { return '1'; } }
+/* 코치 마크: 실제 화면 항목을 하나씩 비추고 설명을 붙인다(FS Portal 의 둘러보기와 같은 방식) */
 function openGuide(first) {
   if (document.getElementById('gdOv')) return;
+  if (location.hash && location.hash !== '#/' && location.hash !== '#') location.hash = '#/';
+  var steps = GUIDE_STEPS, n = 0;
   var ov = document.createElement('div');
   ov.className = 'gdov'; ov.id = 'gdOv';
   ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
   ov.setAttribute('aria-labelledby', 'gdT');
-  ov.innerHTML =
-    '<div class="gdcard"><h2 id="gdT">' + (first ? '실마리 1분 둘러보기' : '사용 안내') + '</h2>' +
-    '<p class="gdsub">막혔을 때 장비·Error 를 찾아 조치와 부품까지 보는 현장 가이드입니다.</p>' +
-    '<div class="gdl">' + GUIDE_STEPS.map(function (x, i) {
-      return '<div class="gdi"><span class="gdic" aria-hidden="true">' + (i + 1) + '</span>' +
-        '<div><b>' + esc(x[1]) + '</b><p>' + esc(x[2]) + '</p></div></div>';
-    }).join('') + '</div>' +
-    '<button class="gdok" id="gdOk">시작하기</button></div>';
+  ov.innerHTML = '<div class="gdhole" id="gdHole" hidden></div>' +
+    '<div class="gdtip" id="gdTip"><div class="gdn" id="gdN"></div><h2 id="gdT"></h2><p id="gdD"></p>' +
+    '<div class="gdbt"><button class="gdskip" id="gdSkip">건너뛰기</button>' +
+    '<button class="gdok" id="gdOk"></button></div></div>';
   document.body.appendChild(ov);
-  var done = function () {
+  var hole = document.getElementById('gdHole'), tip = document.getElementById('gdTip');
+  var finish = function () {
     try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) {}
+    window.removeEventListener('resize', place);
     ov.remove();
   };
-  var ok = document.getElementById('gdOk');
-  ok.onclick = done;
-  ov.addEventListener('click', function (ev) { if (ev.target === ov) done(); });
-  ov.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') done(); });
-  ok.focus();
+  function place() {
+    var st = steps[n], el = st.sel ? document.querySelector(st.sel) : null;
+    if (st.sel === '.rows' && el) el = el.querySelector('.row') || el;
+    var vh = window.innerHeight, vw = window.innerWidth;
+    if (!el) {
+      hole.hidden = true; ov.classList.add('dim');
+      tip.style.top = Math.max(16, (vh - tip.offsetHeight) / 2) + 'px';
+      return;
+    }
+    ov.classList.remove('dim');
+    var r = el.getBoundingClientRect(), pad = 6;
+    hole.hidden = false;
+    hole.style.top = (r.top - pad) + 'px'; hole.style.left = (r.left - pad) + 'px';
+    hole.style.width = (r.width + pad * 2) + 'px'; hole.style.height = (r.height + pad * 2) + 'px';
+    var th = tip.offsetHeight, below = r.bottom + pad + 12;
+    var top = (below + th + 12 < vh) ? below : Math.max(12, r.top - pad - 12 - th);
+    tip.style.top = top + 'px';
+  }
+  function show() {
+    var st = steps[n], el = st.sel ? document.querySelector(st.sel) : null;
+    if (st.sel === '.rows' && el) el = el.querySelector('.row') || el;
+    if (el && el.scrollIntoView) {
+      var r0 = el.getBoundingClientRect();
+      if (r0.top < 110 || r0.bottom > window.innerHeight - 170) {
+        window.scrollTo(0, Math.max(0, window.pageYOffset + r0.top - 130));
+      }
+    }
+    document.getElementById('gdN').textContent = (n + 1) + ' / ' + steps.length;
+    document.getElementById('gdT').textContent = st.t;
+    document.getElementById('gdD').textContent = st.d;
+    document.getElementById('gdOk').textContent = (n === steps.length - 1) ? '시작하기' : '다음';
+    place();
+    setTimeout(place, 120);
+  }
+  document.getElementById('gdOk').onclick = function () {
+    if (n >= steps.length - 1) finish(); else { n++; show(); }
+  };
+  document.getElementById('gdSkip').onclick = finish;
+  ov.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') finish(); });
+  window.addEventListener('resize', place);
+  show();
+  document.getElementById('gdOk').focus();
 }
 
 function renderHome() {
