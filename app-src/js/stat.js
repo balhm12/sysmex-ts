@@ -89,7 +89,9 @@ var STAT = (function () {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ a: aid(), t: batch[0].t, v: batch })
     }).then(function (r) {
-      if (!r.ok) throw new Error(r.status);
+      // 규칙이 거부한 묶음(4xx)은 다시 보내도 같은 결과다 — 버려서 뒤의 것이 막히지 않게 한다.
+      // 서버 오류(5xx)·연결 실패는 큐에 그대로 두고 다음에 다시 보낸다.
+      if (!r.ok && !(r.status >= 400 && r.status < 500)) throw new Error(r.status);
       setQueue(queue().slice(batch.length));
       sending = false;
       if (queue().length) flush();
@@ -111,6 +113,12 @@ var STAT = (function () {
     /* Error 상세를 열었을 때 — 장비와 Error 이름만 */
     view: function (dev, name) {
       add({ k: 'view', t: today(), d: String(dev || ''), e: String(name || '').slice(0, 80) });
+    },
+    /* 조치 결과 의견 — 'y' 이 조치로 해결 · 'n' 해결 안 됨 · 'o' 다른 조치로 해결.
+       장비·Error 이름·세 값 중 하나만 보낸다 (누구인지 알 수 있는 것은 없다). */
+    fb: function (dev, name, res) {
+      if (!/^[yno]$/.test(res)) return;
+      add({ k: 'fb', t: today(), d: String(dev || '').slice(0, 40), e: String(name || '').slice(0, 80), r: res });
     },
     on: function () { return !!ENDPOINT; },
     flush: flush
