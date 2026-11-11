@@ -807,11 +807,11 @@ details.lg summary{cursor:pointer;min-height:44px;display:flex;align-items:cente
 details.lg p{margin:0 0 4px;font-size:12.5px;line-height:1.6;color:var(--mid)}
 .chk b.ok{color:var(--mid);font-weight:700}
 .tag.est{background:#eef0f3;color:var(--mid);font-weight:600}
-.qp{margin-top:10px}
+.qp{margin-top:10px;padding:14px 16px 12px}
 .qp h3{margin:0 0 6px;font-size:14.5px;font-weight:700;color:var(--ink)}
 .qp .dim{margin:0 0 6px;font-size:12px}
 .qr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
-.qr .nm{min-width:0;font-size:14px;font-weight:600;color:var(--ink);line-height:1.4}
+.qr .nm{min-width:0;flex:1 1 auto;overflow-wrap:anywhere;font-size:14px;font-weight:600;color:var(--ink);line-height:1.4}
 .qr .pn{display:block;font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:12px;
   font-weight:500;color:var(--mid);margin-top:1px}
 .qr .smpn{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:6px;background:var(--pri-w);
