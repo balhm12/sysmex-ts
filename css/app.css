@@ -767,3 +767,21 @@ h1,h2,h3{font-weight:700}
 @keyframes splwv{to{transform:translateX(-80px)}}
 .boot #bootmsg{font-size:13px;margin:0}
 @media (prefers-reduced-motion:reduce){.boot .splwave svg{animation:none}}
+
+/* ── 처음 사용 안내 (FS Portal 「1분 둘러보기」와 같은 구성) ── */
+.gdov{position:fixed;inset:0;z-index:95;background:rgba(16,24,40,.5);display:flex;
+  align-items:flex-end;justify-content:center}
+.gdcard{width:100%;max-width:520px;max-height:90vh;overflow:auto;background:var(--card);
+  border-radius:20px 20px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 30px rgba(0,40,90,.25)}
+.gdcard h2{margin:0 0 4px;font-size:20px;font-weight:700;color:var(--ink)}
+.gdsub{margin:0 0 14px;font-size:13.5px;color:var(--mid);line-height:1.55}
+.gdi{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.gdic{flex:none;width:36px;height:36px;border-radius:10px;background:var(--pri-w);
+  display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--pri)}
+.gdi b{font-size:14.5px;color:var(--ink)}
+.gdi p{margin:2px 0 0;font-size:13px;line-height:1.55;color:var(--mid)}
+.gdok{display:block;width:100%;min-height:48px;margin-top:12px;border:0;border-radius:12px;
+  background:var(--pri);color:#fff;font-size:15px;font-weight:700;cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,63,128,.2)}
+@media (min-width:700px){.gdov{align-items:center}.gdcard{border-radius:20px}}
