@@ -59,13 +59,19 @@
 <main id="view" aria-live="polite"></main>
 
 <div id="boot" class="boot">
-  <p id="bootmsg">① 파일 열림 — 자바스크립트 대기 중</p>
+  <div class="splbox">
+    <img class="spllogo" src="icons/icon-192.png" alt="" width="72" height="72">
+    <div class="splname">실마리</div>
+    <div class="splwave" aria-hidden="true"><svg viewBox="0 0 320 24" preserveAspectRatio="none"><path d="M0 12 Q20 4 40 12 T80 12 T120 12 T160 12 T200 12 T240 12 T280 12 T320 12 V24 H0Z"/></svg></div>
+    <p id="bootmsg" role="status" aria-live="polite">연결 중…</p>
+  </div>
 </div>
 <script>
 /* 어디까지 진행됐는지 화면에 남긴다. 여기서 멈추면 그 단계가 문제다. */
 window.__step = function (t) {
+  /* 화면에는 「연결 중…」만 보이고, 단계는 속성에 남긴다(멈췄을 때 개발자 도구로 확인) */
   var el = document.getElementById('bootmsg');
-  if (el) el.innerHTML = t;
+  if (el) el.setAttribute('data-step', t);
 };
 window.__step('② 자바스크립트 실행됨 — 데이터 읽는 중');
 window.onerror = function (msg, src, line) {

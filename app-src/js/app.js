@@ -1831,6 +1831,11 @@ function start() {
     .then(function (m) {
       META = m;
       if (window.__step) window.__step('④ 장비 목록 읽음 — 화면 그리는 중');
+      // 접속하면 로딩 화면을 최소 1초 보여 준다(FS Portal 과 같은 느낌). 이미 1초가 지났으면 바로.
+      var wait = Math.max(0, 1000 - (window.performance ? performance.now() : 1000));
+      return new Promise(function (ok) { setTimeout(ok, wait); });
+    })
+    .then(function () {
       if (boot.parentNode) boot.remove();
       route();                                  // 홈은 여기서 이미 보인다
       var idle = window.requestIdleCallback ||
