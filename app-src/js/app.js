@@ -892,7 +892,7 @@ function stagesHTML(steps) {
     var items = (s.items || []).map(function (it, ii) {
       var id = 'c' + si + '_' + ii;
       // 조치 자체가 눈에 들어오게 — "—" 뒤의 건수·사례 설명은 작고 연하게
-      var t = rich(it);
+      var t = rich(it).replace(/해결 (\d+\/\d+)/g, '양호로 끝남 $1');
       var cut = t.indexOf(' — ');
       if (cut > 0) t = t.slice(0, cut) + ' <span class="dim">— ' + t.slice(cut + 3) + '</span>';
       return '<label class="chk" for="' + id + '">' +
@@ -993,7 +993,6 @@ function specsHTML(e) {
 function crmHTML(e) {
   var c = e.crm || {};
   var b = '';
-  if (e.cause) b += '<p>' + rich(e.cause) + '</p>';
   // 근거가 얇은 카드는 조치 위에 먼저 밝힌다. 조치를 본 **뒤에** 알려 주면
   // 이미 그대로 하고 있다. 확실한 두 가지(S/M · 부품 P/N)로 보낸다.
   // 현장이 직접 남긴 메모 — 집계에서 역산한 것이 아니라 사람이 적은 말이다.
@@ -1006,21 +1005,80 @@ function crmHTML(e) {
       '</ul><span>위의 <b>S/M Standard</b> 와 아래 <b>관련 부품</b>(<b>S/M 지정</b> 배지가 있으면 그것부터)' +
       ' 을 함께 보고 판단하십시오.</span></div>';
   }
-  b += '<h4>현장 조치 (작업 기록 ' + num(c.base || 0) + '건 집계)</h4>' + stagesHTML(e.steps) +
-    // 숫자 두 개의 뜻이 다르다 — 한 줄로 밝혀 둔다
-    '<p class="muted">앞의 <b>N건</b>은 그 조치를 한 횟수, ' +
-    '<b class="ok">해결 N/M</b>은 그 조치를 한 방문 M건 중 ' +
-    '<b>문제가 난 뒤에 이 조치를 하고 「양호」로 끝난</b> 것이 N건이라는 뜻입니다. ' +
-    '많이 한 조치와 실제로 해결한 조치는 다릅니다. ' +
-    '<b>교체는 앞의 확인·세정·조정을 마친 뒤 마지막에 합니다.</b></p>';
+  var hasSteps = !!(e.steps && e.steps.length);
+  b += '<h4>현장 조치 <span class="dim">(작업 기록 ' + num(c.base || 0) + '건 집계)</span></h4>' +
+    (hasSteps ? '<div class="ckbar"><span id="ckn"></span>' +
+      '<button type="button" class="ckreset" id="ckReset" hidden>처음부터</button></div>' : '') +
+    stagesHTML(e.steps) +
+    // 숫자의 뜻은 접어 둔다 — 현장에서는 조치가 먼저이고, 설명은 궁금할 때만
+    '<details class="lg"><summary>숫자 보는 법</summary>' +
+    '<p>앞의 <b>N건</b>은 그 조치를 한 횟수입니다. <b>양호로 끝남 N/M</b>은 그 조치를 한 방문 M건 중 ' +
+    '마지막 실패 뒤에 이 조치가 적혀 있고 기록이 「양호」로 끝난 것이 N건이라는 뜻입니다. ' +
+    '<b>조치와 「양호」가 함께 적혔다는 뜻이지, 그 조치가 원인을 해결했다는 증명은 아닙니다</b> ' +
+    '(점검해 보니 양호했다는 기록도 들어갑니다). ' +
+    '교체는 앞의 확인·세정·조정을 마친 뒤 마지막에 합니다.</p></details>';
   if (e.verify) b += '<h4>조치 후 확인</h4><p>' + rich(e.verify) + '</p>';
   if (e.caution) b += '<h4>주의사항</h4><p>' + rich(e.caution) + '</p>';
-  return '<details class="acc crm" open><summary>CRM Actual<span class="src">현장</span>' +
+  // 원인은 조치 뒤에 둔다 — 조치 빈도에서 거꾸로 짚은 **추정**이라 근거 등급이 다르다
+  if (e.cause || (e.cause_share && e.cause_share.items && e.cause_share.items.length)) {
+    b += '<h4>원인 추정 <span class="tag est">추정 · 조치 빈도 기반</span></h4>' +
+      (e.cause ? '<p>' + rich(e.cause) + '</p>' : '') + bar(e.cause_share);
+  }
+  return '<details class="acc crm" open><summary>현장 조치 · CRM Actual<span class="src">현장</span>' +
     '</summary><div class="body">' + b + '</div></details>';
 }
+/* 출동 전 챙길 부품 — 접힌 Related Parts 를 열지 않아도 상위 3개가 조치 바로 밑에 보인다 */
+function quickPartsHTML(e) {
+  var c = e.crm || {};
+  var pn = c.pn || e.pn || [];
+  if (!pn.length) return '';
+  var nv = c.pn_n || e.pn_n || 0;
+  return '<div class="card qp"><h3>출동 전 챙길 부품</h3>' +
+    (nv && nv < 3 ? '<p class="dim">방문 ' + nv + '건의 기록 — 통계가 아닙니다</p>' : '') +
+    pn.slice(0, 3).map(function (r) {
+      return '<div class="qr"><span class="nm">' + esc(r.name) +
+        (r.pn ? '<i class="pn' + (r.old ? ' old' : '') + '">' + esc(r.pn) + '</i>'
+              : '<i class="pn no">P/N 미등록</i>') +
+        (r.sm ? '<em class="smpn">S/M 지정</em>' : '') + '</span>' +
+        '<span class="q">' + num(r.n) + '건</span></div>';
+    }).join('') +
+    '<button type="button" class="qall" id="openParts">전체 부품·센서 보기</button></div>';
+}
 
-/* XN Data 불량 — 측정 항목 × 증상(높음/낮음/재현성) 분해.
-   WBC 계열(WNR·WDF·RET·WPC 등)은 FCM 계통, RBC·HCT·PLT 는 RBC 계통 (현장 기준). */
+/* ── 조치 체크 진행: 이 기기에만 저장(Error 별) ── */
+var CK_STORE = 'ts-ck', CK_KEY = '';
+function ckLoad() { try { return JSON.parse(localStorage.getItem(CK_STORE) || '{}') || {}; } catch (e) { return {}; } }
+function ckSaveAll(o) {
+  try {
+    var ks = Object.keys(o);
+    if (ks.length > 60) {                    // 오래된 것부터 정리 (삽입 순서)
+      ks.slice(0, ks.length - 60).forEach(function (k) { delete o[k]; });
+    }
+    localStorage.setItem(CK_STORE, JSON.stringify(o));
+  } catch (e) { /* 저장이 안 돼도 화면은 그대로 */ }
+}
+function ckSync(save) {
+  var boxes = document.querySelectorAll('.stage .chk input');
+  var n = boxes.length, done = [];
+  boxes.forEach(function (x) { if (x.checked) done.push(x.id); });
+  if (save && CK_KEY) {
+    var o = ckLoad(); delete o[CK_KEY];
+    if (done.length) o[CK_KEY] = done;
+    ckSaveAll(o);
+  }
+  var el = document.getElementById('ckn'), rb = document.getElementById('ckReset');
+  if (el) el.textContent = n ? ('진행 ' + done.length + ' / ' + n) : '';
+  if (rb) rb.hidden = !done.length;
+}
+function ckRestore() {
+  var ids = ckLoad()[CK_KEY] || [];
+  ids.forEach(function (id) {
+    var x = document.getElementById(id);
+    if (x && x.type === 'checkbox') { x.checked = true; x.closest('.chk').classList.add('done'); }
+  });
+  ckSync(false);
+}
+
 function itemsHTML(e) {
   var di = e.data_items;
   if (!di || !(di.items || []).length) return '';
@@ -1453,7 +1511,7 @@ function partsHTML(e) {
   var peek = top
     ? '<span class="cz">' + esc(top.name) +
       (pn.length > 1 ? ' 외 ' + (pn.length - 1) : '') + '</span>' : '';
-  return '<details class="acc crm"><summary>Related Parts' + peek +
+  return '<details class="acc crm" id="relParts"><summary>Related Parts' + peek +
     '<span class="src">현장</span></summary><div class="body">' + b + '</div></details>';
 }
 
@@ -1684,22 +1742,21 @@ function renderError(dev, part, idx) {
     var rp = (r.base >= 10) ? r.p30 : null;
     var sv = sevOf(rp);
     var factsHTML =
-      '<div class="facts ' + sv + '">' +
-      '<div class="fr">' +
-      '<div class="f"><span>발생 횟수</span><b>' + num(e.n) + '건</b></div>' +
-      '<div class="f"><span>재발률</span><b>' +
-      (rp == null ? '<em class="na">자료 부족</em>'
-                  : rp + '%<em>' + sevWord(rp) + '</em>') + '</b></div>' +
+      '<div class="qf ' + sv + '">' +
+      '<span><i>발생</i><b>' + num(e.n) + '건</b></span>' +
+      '<span class="rc"><i>재발률</i><b>' +
+      (rp == null ? '자료 부족' : rp + '% <em>' + sevWord(rp) + '</em>') + '</b></span>' +
+      '<button type="button" class="qfi" id="qfInfo" aria-expanded="false" aria-controls="qfx">ⓘ 기준</button>' +
       '</div>' +
-      (rp == null ? '' :
-        '<div class="g"><i style="width:' + Math.max(2, Math.min(100, rp)) + '%"></i></div>') +
-      '<p class="cap">' +
+      '<p class="cap" id="qfx" hidden>' +
       (rp == null
         ? '재발을 판정할 만큼 기록이 쌓이지 않았습니다.'
         : '재발률은 같은 장비를 <b>30일 안에 다시</b> 부른 비율입니다 — ' +
-          '앞선 방문이 있어 간격을 잴 수 있는 ' + num(r.base) + '건으로 셌습니다.<br>' +
+          '앞선 방문이 있어 간격을 잴 수 있는 ' + num(r.base) + '건으로 셌습니다. ' +
+          '이 Error 의 조치가 틀렸다는 뜻이 아니라, 같은 장비로 다시 방문한 비율입니다.<br>' +
           '<span class="rule">' + SEV_RULE + '</span>') +
-      '</p></div>';
+      '</p>' +
+      '<p class="basis">현장 기록 기반 순서이며 <b>공식 절차가 아닙니다</b> — 최종 조치는 S/M · IFU 를 따릅니다.</p>';
 
     var head =
       '<div class="card head">' +
@@ -1715,15 +1772,16 @@ function renderError(dev, part, idx) {
       '<h1>' + esc(e.en) + '</h1>' +
       (e.ko ? '<p class="ko">' + esc(e.ko) + '</p>' : '') +
       factsHTML +
-      bar(e.cause_share) +
       // '조치 순서 보기' 버튼은 뺐다 — 바로 밑에 CRM Actual 이 펼쳐진 채로 있어
       // 눌러도 같은 자리로 내려갈 뿐이었다 (현장 지적 2026-08-25).
       '</div>';
 
     var more = ((j.cn || {})[key] || {})[idx] || 0;
-    view.innerHTML = head + specsHTML(e) + smHTML(e) + crmHTML(e) + specialHTML(e) + itemsHTML(e) +
+    CK_KEY = dev + '|' + key + '|' + idx;
+    view.innerHTML = head + crmHTML(e) + quickPartsHTML(e) + specsHTML(e) + smHTML(e) + specialHTML(e) + itemsHTML(e) +
       swNoteHTML(e) + notesHTML(e) + partsHTML(e) + diagHTML(e) + relatedHTML(e, dev) + recordsHTML(e, more) + dataHTML(e) +
       fbHTML(dev, e, part);
+    ckRestore();
     var mb = $('#moreCases');
     if (mb) {
       mb.addEventListener('click', function () {
@@ -1846,6 +1904,24 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('change', function (ev) {
   if (ev.target.matches('.chk input')) {
     ev.target.closest('.chk').classList.toggle('done', ev.target.checked);
+    if (ev.target.closest('.stage')) ckSync(true);
+  }
+});
+document.addEventListener('click', function (ev) {
+  var id = ev.target.id;
+  if (id === 'qfInfo') {
+    var x = document.getElementById('qfx'), open = x.hidden;
+    x.hidden = !open; ev.target.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  if (id === 'ckReset') {
+    document.querySelectorAll('.stage .chk input').forEach(function (b) {
+      b.checked = false; b.closest('.chk').classList.remove('done');
+    });
+    ckSync(true);
+  }
+  if (id === 'openParts') {
+    var d = document.getElementById('relParts');
+    if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   }
 });
 
